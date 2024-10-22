@@ -223,11 +223,6 @@ class HandMouseController:
             self.cap.release()
             cv2.destroyAllWindows()
 
-if __name__ == "__main__":
-    controller = HandMouseController()
-    controller.run()
-
-
 def handle_login_gui(username):
     # Destroy the login window and create the main application window
     login_window.destroy()
