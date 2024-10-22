@@ -4,6 +4,10 @@ import mediapipe as mp
 import pyautogui
 import time
 import os
+# Below here all imports are for the GUI - DOMINICK
+import tkinter as tk
+from tkinter import ttk
+from threading import Thread
 
 class HandMouseController:
     def __init__(self):
@@ -219,6 +223,90 @@ class HandMouseController:
             self.cap.release()
             cv2.destroyAllWindows()
 
+def handle_login_gui(username):
+    # Destroy the login window and create the main application window
+    login_window.destroy()
+    app_window = tk.Tk()
+    app_window.title("Hand Gesture Mouse Controller")
+    app_window.geometry("640x480")  # Set the resolution of the main window
+
+    style = ttk.Style()
+    style.configure("TLabel", font=("Verdana", 15, "bold"))
+    style.configure("TButton", font=("Verdana", 12), padding=10)
+
+    # Create a label to display the username
+    ttk.Label(app_window, text=f"Welcome, {username}!", padding=(20, 10)).pack()
+
+    # Create a button to start the hand gesture controller
+    start_button = ttk.Button(app_window, text="Start Hand Gesture Controller", command=lambda: start_hand_mouse_controller(app_window))
+    start_button.pack(pady=20)
+
+    # Create a button to view the hand gesture guide
+    view_button = ttk.Button(app_window, text="View Hand Gesture Guide", command=view_gestures)
+    view_button.pack(pady=10)
+
+    app_window.mainloop()
+
+def start_hand_mouse_controller(app_window):
+    # Create a loading window
+    loading_window = tk.Toplevel(app_window)
+    loading_window.title("Loading")
+    loading_window.geometry("300x100")
+    
+    # Create a label to indicate loading
+    ttk.Label(loading_window, text="Starting camera...", padding=(20, 10)).pack()
+    
+    # Create a progress bar
+    progress_bar = ttk.Progressbar(loading_window, mode='indeterminate')
+    progress_bar.pack(pady=20, padx=20, fill=tk.X)
+    progress_bar.start()
+    
+    # Function to start the hand mouse controller
+    def start_controller():
+        controller = HandMouseController()
+        loading_window.destroy()
+        controller.run()
+        app_window.destroy()
+    
+    # Start the controller in a separate thread to avoid blocking the UI
+    Thread(target=start_controller).start()
+
+def view_gestures():
+    # Create a new window to display the gesture guide
+    gestures_window = tk.Toplevel()
+    gestures_window.title("Hand Gesture Guide")
+    gestures_window.geometry("640x480")  # Set the resolution of the gestures window
+
+    # Show the gesture guide image
+    gestures_image = tk.PhotoImage(file="gestures.png")
+    gestures_label = ttk.Label(gestures_window, image=gestures_image)
+    gestures_label.pack()
+
+    gestures_window.mainloop()
+
 if __name__ == "__main__":
-    controller = HandMouseController()
-    controller.run()
+    # Create the login screen
+    login_window = tk.Tk()
+    login_window.title("Login Screen")
+    login_window.geometry("640x480")  # Set the resolution of the login window
+
+    style = ttk.Style()
+    style.configure("TLabel", font=("Verdana", 12))
+    style.configure("TButton", font=("Verdana", 12), padding=10)
+    style.configure("TEntry", font=("Verdana", 12))
+
+    frame = ttk.Frame(login_window, padding="20")
+    frame.pack(expand=True)
+
+    ttk.Label(frame, text="Username:").pack(pady=10)
+    username_entry = ttk.Entry(frame, width=40)
+    username_entry.pack(pady=10, fill=tk.X)
+
+    ttk.Label(frame, text="Password:").pack(pady=10)
+    password_entry = ttk.Entry(frame, width=40, show="*")
+    password_entry.pack(pady=10, fill=tk.X)
+
+    login_button = ttk.Button(frame, text="Login", command=lambda: handle_login_gui(username_entry.get()))
+    login_button.pack(pady=20)
+
+    login_window.mainloop()
