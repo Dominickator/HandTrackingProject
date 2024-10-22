@@ -77,9 +77,10 @@ class HandMouseController:
 
     def handle_gesture(self, thumb_tip, index_tip):
         """Handles click and drag events based on thumb and index fingertip positions."""
-        # Check if only thumb and index finger are up
         fingers = self.fingers_up()
-        if fingers == [1, 1, 0, 0, 0]:
+        # Check if index finger is up, and middle, ring, and pinky fingers are down
+        if fingers[1] == 1 and fingers[2] == 0 and fingers[3] == 0 and fingers[4] == 0:
+            # Check if thumb and index finger are touching
             if self.is_fingers_touching(thumb_tip, index_tip):
                 if self.touch_start_time is None:
                     self.touch_start_time = time.time()
@@ -112,11 +113,8 @@ class HandMouseController:
         """Determines which fingers are up and returns a list."""
         fingers = []
 
-        # Thumb
-        if self.lm_list[4][0] > self.lm_list[3][0]:
-            fingers.append(1)  # Thumb is up
-        else:
-            fingers.append(0)  # Thumb is down
+        # Thumb (we'll ignore thumb detection for now)
+        fingers.append(0)  # Set thumb as down by default or adjust as needed
 
         # Fingers (Index to Pinky)
         tips_ids = [8, 12, 16, 20]
@@ -142,6 +140,10 @@ class HandMouseController:
     def detect_shaka_sign(self):
         """Detects if the user is making the hang loose (Shaka) sign."""
         fingers = self.fingers_up()
+
+        # Thumb detection adjusted for consistency
+        thumb_up = self.lm_list[4][0] > self.lm_list[2][0]
+        fingers[0] = 1 if thumb_up else 0
 
         # Check for Shaka sign: Thumb and Pinky up, other fingers down
         if fingers == [1, 0, 0, 0, 1]:
