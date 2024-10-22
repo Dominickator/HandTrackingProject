@@ -49,9 +49,28 @@ class HandMouseController:
         self.last_screenshot_time = 0
 
     def display_no_camera_popup(self):
-        """Displays a popup window if no camera is detected and closes the application."""
-        messagebox.showerror("Camera Not Found", "No camera detected. The application will close.")
-        os._exit(1)  # Gracefully exit the application
+        """Displays a popup window if no camera is detected and closes the application after a delay."""
+        popup_window = tk.Tk()
+        popup_window.withdraw()  # Hide the root window
+
+        # Create a messagebox with a delay
+        def close_after_delay():
+            time.sleep(10)  # Wait for 10 seconds
+            popup_window.quit()  # Close the window
+
+        # Show the error message
+        messagebox.showerror("Camera Not Found", "No camera detected. The application will close in 10 seconds or press OK to exit now.")
+        
+        # Start the delay in a separate thread so it doesn't block the UI
+        delay_thread = Thread(target=close_after_delay)
+        delay_thread.start()
+
+        # Start the Tkinter event loop to keep the popup alive
+        popup_window.mainloop()
+
+        # Ensure the application exits gracefully
+        os._exit(1)
+
 
     def get_landmark_positions(self, hand_landmarks):
         """Extracts landmark positions and returns key fingertip coordinates."""
