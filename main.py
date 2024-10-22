@@ -4,9 +4,8 @@ import mediapipe as mp
 import pyautogui
 import time
 import os
-# Below here all imports are for the GUI - DOMINICK
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from threading import Thread
 
 class HandMouseController:
@@ -27,6 +26,11 @@ class HandMouseController:
 
         # Video capture
         self.cap = cv2.VideoCapture(0)
+
+        if not self.cap.isOpened():
+            self.display_no_camera_popup()
+            return
+
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.cam_width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.cam_height)
 
@@ -43,6 +47,30 @@ class HandMouseController:
         # Screenshot state variables
         self.screenshot_cooldown = 2  # seconds
         self.last_screenshot_time = 0
+
+    def display_no_camera_popup(self):
+        """Displays a popup window if no camera is detected and closes the application after a delay."""
+        popup_window = tk.Tk()
+        popup_window.withdraw()  # Hide the root window
+
+        # Create a messagebox with a delay
+        def close_after_delay():
+            time.sleep(10)  # Wait for 10 seconds
+            popup_window.quit()  # Close the window
+
+        # Show the error message
+        messagebox.showerror("Camera Not Found", "No camera detected. The application will close in 10 seconds or press OK to exit now.")
+        
+        # Start the delay in a separate thread so it doesn't block the UI
+        delay_thread = Thread(target=close_after_delay)
+        delay_thread.start()
+
+        # Start the Tkinter event loop to keep the popup alive
+        popup_window.mainloop()
+
+        # Ensure the application exits gracefully
+        os._exit(1)
+
 
     def get_landmark_positions(self, hand_landmarks):
         """Extracts landmark positions and returns key fingertip coordinates."""
