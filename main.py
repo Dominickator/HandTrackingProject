@@ -4,6 +4,8 @@ import mediapipe as mp
 import pyautogui
 import time
 import os
+import webbrowser
+from tkinter import simpledialog
 import tkinter as tk
 from tkinter import messagebox, ttk
 from threading import Thread
@@ -175,7 +177,6 @@ class HandMouseController:
             else:
                 fingers.append(0)  # Finger is down
 
-        print(f"Fingers detected: {fingers}")  # Debugging
         return fingers  # [Thumb, Index, Middle, Ring, Pinky]
 
 
@@ -271,6 +272,7 @@ class HandMouseController:
 
     def execute_action(self, action):
         """Executes the assigned action for a gesture."""
+        print(f"Executing action: {action}")
         normalized_action = action.strip().lower()
         try:
             if normalized_action == "open snipping tool":
@@ -279,11 +281,11 @@ class HandMouseController:
                 except FileNotFoundError:
                     subprocess.Popen('SnippingTool.exe')
             elif normalized_action == "open calculator":
-                subprocess.Popen('calc')  # For Windows
+                subprocess.Popen('calc')
             elif normalized_action == "open notepad":
-                subprocess.Popen('notepad')  # For Windows
+                subprocess.Popen('notepad')
             elif normalized_action == "lock screen":
-                pyautogui.hotkey('win', 'l')  # Locks the screen
+                pyautogui.hotkey('win', 'l')
             elif normalized_action == "play/pause media":
                 pyautogui.press('playpause')
             elif normalized_action == "next track":
@@ -296,9 +298,11 @@ class HandMouseController:
                 pyautogui.press('volumedown')
             elif normalized_action == "mute/unmute":
                 pyautogui.press('volumemute')
+            elif action.startswith('http://') or action.startswith('https://'):
+                webbrowser.open(action)
             else:
-                # If action is a custom command or application
-                subprocess.Popen(action)
+                # Attempt to execute the action as a command
+                subprocess.Popen(action, shell=True)
         except Exception as e:
             print(f"Error executing action '{action}': {e}")
 
@@ -356,8 +360,8 @@ def configure_gestures():
     config_window.title("Configure Gestures")
     config_window.geometry("400x400")
 
-    gestures = [2, 3, 4]  # Number of fingers up to configure
-    actions = [
+    gestures = [2, 3, 4]
+    actions = [  # Updated actions list with "Other..."
         "Open Snipping Tool",
         "Open Calculator",
         "Open Notepad",
@@ -368,28 +372,34 @@ def configure_gestures():
         "Volume Up",
         "Volume Down",
         "Mute/Unmute",
+        "Other..."
     ]
-
-    gesture_actions = {}
 
     # Load existing configuration if available
     config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
-    print(f"Configuration file path (saving): {config_file}")
     if os.path.exists(config_file):
         with open(config_file, 'r') as f:
             gesture_actions = json.load(f)
     else:
-        # Initialize default configuration
         gesture_actions = {str(g): actions[0] for g in gestures}
 
     dropdowns = {}
 
     def save_configuration():
-        print("Save configuration function called")
         # Save the selected actions
         for g in gestures:
             selected_action = dropdowns[g].get()
-            gesture_actions[str(g)] = selected_action
+            if selected_action == "Other...":
+                # Prompt user for custom input
+                custom_action = simpledialog.askstring("Custom Action", f"Enter custom action for gesture {g}:")
+                if custom_action:
+                    gesture_actions[str(g)] = custom_action
+                else:
+                    # If no input, default to first action
+                    gesture_actions[str(g)] = actions[0]
+                    dropdowns[g].set(actions[0])
+            else:
+                gesture_actions[str(g)] = selected_action
         try:
             with open(config_file, 'w') as f:
                 json.dump(gesture_actions, f)
@@ -402,14 +412,16 @@ def configure_gestures():
         ttk.Label(config_window, text=f"Gesture: {g} Fingers Up").pack(pady=5)
         default_value = gesture_actions.get(str(g), actions[0])
         combobox = ttk.Combobox(config_window, values=actions, state='readonly')
+        # Include custom action if not in actions
+        if default_value not in actions:
+            combobox['values'] = actions + [default_value]
         combobox.set(default_value)
         combobox.pack(pady=5)
-        dropdowns[g] = combobox  # Store combobox directly
+        dropdowns[g] = combobox
 
-    # Move the Save button outside the loop
     ttk.Button(config_window, text="Save", command=save_configuration).pack(pady=20)
-
     config_window.mainloop()
+
 
 
 def handle_login_gui(username):
