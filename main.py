@@ -61,6 +61,8 @@ class HandMouseController:
         self.current_gesture = None
         self.gesture_start_time = None
 
+        self.fist_detected_seconds = 0  # Counter for the seconds the fist is detected
+
     def display_no_camera_popup(self):
         """Displays a popup window if no camera is detected and closes the application after a delay."""
         popup_window = tk.Tk()
@@ -186,6 +188,15 @@ class HandMouseController:
         print(f"Middle Finger Gesture Detection - Fingers: {fingers}")  # Debugging statement
         # Exclude thumb from consideration
         if fingers[1:] == [0, 1, 0, 0]:  # [Index, Middle, Ring, Pinky]
+            return True
+        else:
+            return False
+    
+    def detect_curled_fist(self):
+        """Detects if all fingers are down."""
+        fingers = self.fingers_up()
+        # Exclude thumb from consideration
+        if fingers == [0, 0, 0, 0, 0]:  # [Thumb, Index, Middle, Ring, Pinky]
             return True
         else:
             return False
@@ -334,6 +345,11 @@ class HandMouseController:
                         break
                     elif self.detect_shaka_sign():
                         self.take_screenshot()
+                    elif self.detect_curled_fist():
+                        self.fist_detected_seconds += 0.1  # Increment counter if fist is detected
+                        if self.fist_detected_seconds >= 43:  # Check if the fist has been held for 60 seconds
+                            webbrowser.open("https://blacklivesmatter.com/") #Easter Egg
+                            self.fist_detected_seconds = 0  # Reset the counter after opening the website
                     else:
                         self.detect_custom_gestures()
                         # Handle click and drag
