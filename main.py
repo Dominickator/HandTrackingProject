@@ -347,7 +347,7 @@ class HandMouseController:
                         self.take_screenshot()
                     elif self.detect_curled_fist():
                         self.fist_detected_seconds += 0.1  # Increment counter if fist is detected
-                        if self.fist_detected_seconds >= 43:  # Check if the fist has been held for 60 seconds
+                        if self.fist_detected_seconds >= 42:  # Check if the fist has been held for 60 seconds
                             webbrowser.open("https://blacklivesmatter.com/") #Easter Egg
                             self.fist_detected_seconds = 0  # Reset the counter after opening the website
                     else:
@@ -391,13 +391,31 @@ def configure_gestures():
         "Other..."
     ]
 
+    default_gesture_actions = {
+        "2": "Open Calculator",
+        "3": "Open Snipping Tool",
+        "4": "Open Notepad"
+    }
+
     # Load existing configuration if available
     config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
-    if os.path.exists(config_file):
+    if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
         with open(config_file, 'r') as f:
-            gesture_actions = json.load(f)
+            try:
+                gesture_actions = json.load(f)
+            except JSONDecodeError:
+                print("Invalid JSON in gesture_config.json. Loading default configuration.")
+                messagebox.showwarning("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")
+                gesture_actions = default_gesture_actions.copy()
+                # Save default configuration back to the file
+                with open(config_file, 'w') as fw:
+                    json.dump(gesture_actions, fw)
     else:
-        gesture_actions = {str(g): actions[0] for g in gestures}
+        # File doesn't exist or is empty, use default configuration
+        gesture_actions = default_gesture_actions.copy()
+        # Save default configuration to the file
+        with open(config_file, 'w') as f:
+            json.dump(gesture_actions, f)
 
     dropdowns = {}
 
@@ -411,9 +429,9 @@ def configure_gestures():
                 if custom_action:
                     gesture_actions[str(g)] = custom_action
                 else:
-                    # If no input, default to first action
-                    gesture_actions[str(g)] = actions[0]
-                    dropdowns[g].set(actions[0])
+                    # If no input, default to the previous action
+                    gesture_actions[str(g)] = gesture_actions.get(str(g), actions[0])
+                    dropdowns[g].set(gesture_actions[str(g)])
             else:
                 gesture_actions[str(g)] = selected_action
         try:
@@ -422,6 +440,7 @@ def configure_gestures():
             messagebox.showinfo("Configuration Saved", "Your gesture configurations have been saved.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save configurations: {e}")
+            print(f"Error saving configurations: {e}")
         config_window.destroy()
 
     for g in gestures:
