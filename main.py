@@ -124,45 +124,60 @@ class HandMouseController:
     def handle_gesture(self, thumb_tip, index_tip):
         """Handles click and drag events based on thumb and index fingertip positions."""
         fingers = self.fingers_up()
-        # Check if index finger is up, and middle, ring, and pinky fingers are down
-        if fingers[1] == 1 and fingers[2] == 0 and fingers[3] == 0 and fingers[4] == 0:
+        print(f"Handle Gesture - Fingers: {fingers}")  # Debugging
+
+        # Check if index finger is up and others are down (excluding thumb)
+        if fingers[1] == 1 and sum(fingers[2:]) == 0:
             # Check if thumb and index finger are touching
+            distance = np.linalg.norm(np.array(thumb_tip) - np.array(index_tip))
+            print(f"Distance between thumb and index: {distance}")  # Debugging
             if self.is_fingers_touching(thumb_tip, index_tip):
+                print("Thumb and index are touching")  # Debugging
                 if self.touch_start_time is None:
                     self.touch_start_time = time.time()
                     self.dragging = False
+                    print("Touch start time set")  # Debugging
                 else:
                     elapsed_time = time.time() - self.touch_start_time
+                    print(f"Elapsed time: {elapsed_time}")  # Debugging
                     if elapsed_time > self.drag_threshold and not self.dragging:
                         # Start dragging
+                        print("Starting drag")  # Debugging
                         pyautogui.mouseDown()
                         self.dragging = True
             else:
+                print("Thumb and index are not touching")  # Debugging
                 if self.touch_start_time is not None:
                     elapsed_time = time.time() - self.touch_start_time
+                    print(f"Elapsed time: {elapsed_time}")  # Debugging
                     if elapsed_time < self.click_threshold and not self.dragging:
                         # Perform click
+                        print("Performing click")  # Debugging
                         pyautogui.click()
                     elif self.dragging:
                         # Stop dragging
+                        print("Stopping drag")  # Debugging
                         pyautogui.mouseUp()
                         self.dragging = False
                 self.touch_start_time = None
         else:
             # If other fingers are up, reset dragging state
             if self.dragging:
+                print("Resetting drag state")  # Debugging
                 pyautogui.mouseUp()
                 self.dragging = False
             self.touch_start_time = None
 
+
     def fingers_up(self):
         """Determines which fingers are up and returns a list."""
         fingers = []
+        threshold = 5  # Adjust as needed
 
-        # Thumb detection
-        thumb_tip_x = self.lm_list[4][0]
-        thumb_ip_x = self.lm_list[2][0]  # Compare with the IP joint for better accuracy
-        if thumb_tip_x > thumb_ip_x:
+        # Thumb detection using y-coordinates
+        thumb_tip_y = self.lm_list[4][1]
+        thumb_ip_y = self.lm_list[3][1]
+        if thumb_ip_y - thumb_tip_y > threshold:
             fingers.append(1)  # Thumb is up
         else:
             fingers.append(0)  # Thumb is down
@@ -174,12 +189,15 @@ class HandMouseController:
         for tip_id, pip_id in zip(tips_ids, pip_ids):
             tip_y = self.lm_list[tip_id][1]
             pip_y = self.lm_list[pip_id][1]
-            if tip_y < pip_y - 5:  # Adjust threshold as needed
+            if pip_y - tip_y > threshold:
                 fingers.append(1)  # Finger is up
             else:
                 fingers.append(0)  # Finger is down
 
+        print(f"Fingers Up: {fingers}")  # Debugging
         return fingers  # [Thumb, Index, Middle, Ring, Pinky]
+
+
 
 
     def detect_middle_finger_gesture(self):
@@ -334,12 +352,19 @@ class HandMouseController:
 
                 if results.multi_hand_landmarks:
                     hand_landmarks = results.multi_hand_landmarks[0]
+                    hand_handedness = results.multi_handedness[0]
+                    label = hand_handedness.classification[0].label  # 'Left' or 'Right'
+                    self.hand_label = label
+
                     thumb_tip, index_tip = self.get_landmark_positions(hand_landmarks)
 
                     # Move cursor
                     self.move_cursor(index_tip)
 
-                    # Detect gestures
+                    # Handle click and drag first
+                    self.handle_gesture(thumb_tip, index_tip)
+
+                    # Then detect other gestures
                     if self.detect_middle_finger_gesture():
                         print("Middle finger gesture detected - Exiting")
                         break
@@ -347,13 +372,11 @@ class HandMouseController:
                         self.take_screenshot()
                     elif self.detect_curled_fist():
                         self.fist_detected_seconds += 0.1  # Increment counter if fist is detected
-                        if self.fist_detected_seconds >= 42:  # Check if the fist has been held for 60 seconds
-                            webbrowser.open("https://blacklivesmatter.com/") #Easter Egg
+                        if self.fist_detected_seconds >= 42:  # Check if the fist has been held for 42 seconds
+                            webbrowser.open("https://blacklivesmatter.com/")  # Easter Egg
                             self.fist_detected_seconds = 0  # Reset the counter after opening the website
                     else:
                         self.detect_custom_gestures()
-                        # Handle click and drag
-                        self.handle_gesture(thumb_tip, index_tip)
 
                     # Draw hand landmarks
                     self.mp_draw.draw_landmarks(img, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
@@ -368,6 +391,7 @@ class HandMouseController:
             # Release resources
             self.cap.release()
             cv2.destroyAllWindows()
+
 
 # GUI functions for configuration
 def configure_gestures():
