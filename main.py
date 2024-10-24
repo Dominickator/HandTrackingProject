@@ -472,14 +472,14 @@ def start_hand_mouse_controller(app_window):
     # Create a loading window
     loading_window = tk.Toplevel(app_window)
     loading_window.title("Loading")
-    loading_window.geometry("300x100")
+    loading_window.geometry("400x125")
     
     # Create a label to indicate loading
-    ttk.Label(loading_window, text="Starting camera...", padding=(20, 10)).pack()
+    ttk.Label(loading_window, text="Starting camera...", padding=(25, 15)).pack()
     
     # Create a progress bar
     progress_bar = ttk.Progressbar(loading_window, mode='indeterminate')
-    progress_bar.pack(pady=20, padx=20, fill=tk.X)
+    progress_bar.pack(pady=10, padx=10, fill=tk.X)
     progress_bar.start()
     
     # Function to start the hand mouse controller
