@@ -2,6 +2,6 @@ opencv-python
 mediapipe
 numpy
 pyautogui
-speechrecognition
 pyaudio
-pyttsx3
+vosk
+sounddevice

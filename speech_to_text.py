@@ -1,48 +1,73 @@
-import speech_recognition as sr
-import pyttsx3 
-#from main import --STT enable/disable command--
+import argparse
+import queue
+import sys
+import sounddevice as sd
+from pyautogui import write
 
-# Initialize the recognizer 
-recognizer = sr.Recognizer() 
+from vosk import Model, KaldiRecognizer
 
-# Function to convert text to
-# speech
-def SpeakText(command):
-    
-    # Initialize the engine
-    engine = pyttsx3.init()
-    engine.say(command) 
-    engine.runAndWait()
-    
-    
+q = queue.Queue()
 
-def run_STT():
-    while('''--STTEnable--'''):    
-        
-        # Exception handling to handle
-        # exceptions at the runtime
-        try:
+def int_or_str(text):
+    """Helper function for argument parsing."""
+    try:
+        return int(text)
+    except ValueError:
+        return text
+
+def callback(indata, frames, time, status):
+    """This is called (from a separate thread) for each audio block."""
+    if status:
+        print(status, file=sys.stderr)
+    q.put(bytes(indata))
+
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument(
+    "-l", "--list-devices", action="store_true",
+    help="show list of audio devices and exit")
+args, remaining = parser.parse_known_args()
+if args.list_devices:
+    print(sd.query_devices())
+    parser.exit(0)
+parser = argparse.ArgumentParser(
+    description=__doc__,
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    parents=[parser])
+parser.add_argument(
+    "-d", "--device", type=int_or_str,
+    help="input device (numeric ID or substring)")
+
+try:
+    device_info = sd.query_devices(args.device, "input")
+    # soundfile expects an int, sounddevice provides a float:
+    args.samplerate = int(device_info["default_samplerate"])
+    model = Model(lang="en-us")
+
+    buffer_queue = queue.Queue()
+
+    with sd.RawInputStream(samplerate=args.samplerate, blocksize = 8000, device=args.device,
+            dtype="int16", channels=1, callback=callback):
+        print("#" * 80)
+        print("Press Ctrl+C to stop the recording")
+        print("#" * 80)
+
+        rec = KaldiRecognizer(model, args.samplerate)
+        while True:
+            data = q.get()
+            if rec.AcceptWaveform(data):
+                print(f"Waveform accepted, recognized word/phrase: {rec.Result()}")
+                buffer_queue.put(rec.Result())
+            else:
+                print(f"Waveform partially accepted, recognized word/phrase: {rec.PartialResult()}")
+                buffer_queue.put(rec.PartialResult())
             
-            # use the microphone as source for input.
-            with sr.Microphone() as source2:
-                
-                # wait for a second to let the recognizer
-                # adjust the energy threshold based on
-                # the surrounding noise level 
-                recognizer.adjust_for_ambient_noise(source2, duration=0.2)
-                
-                #listens for the user's input 
-                audio2 = recognizer.listen(source2)
-                
-                # Using google to recognize audio
-                MyText = recognizer.recognize_google(audio2)
-                MyText = MyText.lower()
+            while not buffer_queue.empty():
+                write(buffer_queue.get())
 
-                print("Did you say: ",MyText)
-                SpeakText(MyText)
-                
-        except sr.RequestError as e:
-            print("Could not request results; {0}".format(e))
-            
-        except sr.UnknownValueError:
-            print("unknown error occurred")
+
+
+except KeyboardInterrupt:
+    print("\nDone")
+    parser.exit(0)
+except Exception as e:
+    parser.exit(type(e).__name__ + ": " + str(e))
