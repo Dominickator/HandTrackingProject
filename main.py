@@ -8,15 +8,24 @@ import webbrowser
 from tkinter import simpledialog
 import tkinter as tk
 from tkinter import messagebox, ttk
+import requests
 import ttkbootstrap as ttkbs
 from threading import Thread
 import json  # To store configurations
 import subprocess  # To run applications
 
+# Imports for firebase integration
+import firebase_admin
+from firebase_admin import credentials, auth
+
 from ttkbootstrap.scrolled import ScrolledFrame
 from ttkbootstrap.toast import ToastNotification
 from ttkbootstrap.tooltip import ToolTip
 from ttkbootstrap.widgets import DateEntry, Floodgauge, Meter
+
+# Initialize Firebase with the certificate
+cred = credentials.Certificate("config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json")
+firebase_admin.initialize_app(cred)
 
 class HandMouseController:
     def __init__(self, gesture_actions):
@@ -437,7 +446,7 @@ def configure_gestures():
         with open(config_file, 'r') as f:
             try:
                 gesture_actions = json.load(f)
-            except JSONDecodeError:
+            except json.JSONDecodeError:
                 print("Invalid JSON in gesture_config.json. Loading default configuration.")
                 messagebox.showwarning("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")
                 gesture_actions = default_gesture_actions.copy()
@@ -493,9 +502,33 @@ def configure_gestures():
 
     config_window.mainloop()
 
+# Define the login function
+def login(email, password):
+    api_key = "AIzaSyCp1nDe4uciVKuJn0G-Io8JVQ5Tsz869OM"  # Replace with your actual API key
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
+    payload = {
+        "email": email,
+        "password": password,
+        "returnSecureToken": True
+    }
+    response = requests.post(url, json=payload)
+    
+    if response.status_code == 200:
+        print("User authenticated successfully:", email)
+        return True
+    else:
+        print("Failed to authenticate:", response.json().get("error", {}).get("message"))
+        return False
 
+def handle_login_gui(username, password):
+    # Handle login using Firebase
+    if login(username, password):
+        # Login successful, open main application window
+        open_main_window(username)
+    else:
+        messagebox.showerror("Login Failed", "Invalid username or password. Please try again.")
 
-def handle_login_gui(username):
+def open_main_window(username):
     # Hide the login window instead of destroying it
     window.withdraw()
 
@@ -623,7 +656,7 @@ if __name__ == "__main__":
     password_entry.pack(pady=5)
 
     login_button = ttkbs.Button(window, text='Login', bootstyle='primary',
-                                command=lambda: handle_login_gui(username_entry.get()))
+                                command=lambda: handle_login_gui(username_entry.get(), password_entry.get()))
     login_button.pack(padx=10, pady=10)
 
     window.mainloop()
