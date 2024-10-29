@@ -4,6 +4,8 @@ import mediapipe as mp
 import pyautogui
 import time
 import os
+import webbrowser
+from tkinter import simpledialog
 import tkinter as tk
 from tkinter import messagebox, ttk
 import ttkbootstrap as ttkbs
@@ -64,6 +66,8 @@ class HandMouseController:
         # Gesture hold tracking
         self.current_gesture = None
         self.gesture_start_time = None
+
+        self.fist_detected_seconds = 0  # Counter for the seconds the fist is detected
 
     def display_no_camera_popup(self):
         """Displays a popup window if no camera is detected and closes the application after a delay."""
@@ -126,45 +130,60 @@ class HandMouseController:
     def handle_gesture(self, thumb_tip, index_tip):
         """Handles click and drag events based on thumb and index fingertip positions."""
         fingers = self.fingers_up()
-        # Check if index finger is up, and middle, ring, and pinky fingers are down
-        if fingers[1] == 1 and fingers[2] == 0 and fingers[3] == 0 and fingers[4] == 0:
+        print(f"Handle Gesture - Fingers: {fingers}")  # Debugging
+
+        # Check if index finger is up and others are down (excluding thumb)
+        if fingers[1] == 1 and sum(fingers[2:]) == 0:
             # Check if thumb and index finger are touching
+            distance = np.linalg.norm(np.array(thumb_tip) - np.array(index_tip))
+            print(f"Distance between thumb and index: {distance}")  # Debugging
             if self.is_fingers_touching(thumb_tip, index_tip):
+                print("Thumb and index are touching")  # Debugging
                 if self.touch_start_time is None:
                     self.touch_start_time = time.time()
                     self.dragging = False
+                    print("Touch start time set")  # Debugging
                 else:
                     elapsed_time = time.time() - self.touch_start_time
+                    print(f"Elapsed time: {elapsed_time}")  # Debugging
                     if elapsed_time > self.drag_threshold and not self.dragging:
                         # Start dragging
+                        print("Starting drag")  # Debugging
                         pyautogui.mouseDown()
                         self.dragging = True
             else:
+                print("Thumb and index are not touching")  # Debugging
                 if self.touch_start_time is not None:
                     elapsed_time = time.time() - self.touch_start_time
+                    print(f"Elapsed time: {elapsed_time}")  # Debugging
                     if elapsed_time < self.click_threshold and not self.dragging:
                         # Perform click
+                        print("Performing click")  # Debugging
                         pyautogui.click()
                     elif self.dragging:
                         # Stop dragging
+                        print("Stopping drag")  # Debugging
                         pyautogui.mouseUp()
                         self.dragging = False
                 self.touch_start_time = None
         else:
             # If other fingers are up, reset dragging state
             if self.dragging:
+                print("Resetting drag state")  # Debugging
                 pyautogui.mouseUp()
                 self.dragging = False
             self.touch_start_time = None
 
+
     def fingers_up(self):
         """Determines which fingers are up and returns a list."""
         fingers = []
+        threshold = 5  # Adjust as needed
 
-        # Thumb detection
-        thumb_tip_x = self.lm_list[4][0]
-        thumb_ip_x = self.lm_list[2][0]  # Compare with the IP joint for better accuracy
-        if thumb_tip_x > thumb_ip_x:
+        # Thumb detection using y-coordinates
+        thumb_tip_y = self.lm_list[4][1]
+        thumb_ip_y = self.lm_list[3][1]
+        if thumb_ip_y - thumb_tip_y > threshold:
             fingers.append(1)  # Thumb is up
         else:
             fingers.append(0)  # Thumb is down
@@ -176,13 +195,15 @@ class HandMouseController:
         for tip_id, pip_id in zip(tips_ids, pip_ids):
             tip_y = self.lm_list[tip_id][1]
             pip_y = self.lm_list[pip_id][1]
-            if tip_y < pip_y - 5:  # Adjust threshold as needed
+            if pip_y - tip_y > threshold:
                 fingers.append(1)  # Finger is up
             else:
                 fingers.append(0)  # Finger is down
 
-        print(f"Fingers detected: {fingers}")  # Debugging
+        print(f"Fingers Up: {fingers}")  # Debugging
         return fingers  # [Thumb, Index, Middle, Ring, Pinky]
+
+
 
 
     def detect_middle_finger_gesture(self):
@@ -191,6 +212,15 @@ class HandMouseController:
         print(f"Middle Finger Gesture Detection - Fingers: {fingers}")  # Debugging statement
         # Exclude thumb from consideration
         if fingers[1:] == [0, 1, 0, 0]:  # [Index, Middle, Ring, Pinky]
+            return True
+        else:
+            return False
+    
+    def detect_curled_fist(self):
+        """Detects if all fingers are down."""
+        fingers = self.fingers_up()
+        # Exclude thumb from consideration
+        if fingers == [0, 0, 0, 0, 0]:  # [Thumb, Index, Middle, Ring, Pinky]
             return True
         else:
             return False
@@ -277,6 +307,7 @@ class HandMouseController:
 
     def execute_action(self, action):
         """Executes the assigned action for a gesture."""
+        print(f"Executing action: {action}")
         normalized_action = action.strip().lower()
         try:
             if normalized_action == "open snipping tool":
@@ -285,11 +316,11 @@ class HandMouseController:
                 except FileNotFoundError:
                     subprocess.Popen('SnippingTool.exe')
             elif normalized_action == "open calculator":
-                subprocess.Popen('calc')  # For Windows
+                subprocess.Popen('calc')
             elif normalized_action == "open notepad":
-                subprocess.Popen('notepad')  # For Windows
+                subprocess.Popen('notepad')
             elif normalized_action == "lock screen":
-                pyautogui.hotkey('win', 'l')  # Locks the screen
+                pyautogui.hotkey('win', 'l')
             elif normalized_action == "play/pause media":
                 pyautogui.press('playpause')
             elif normalized_action == "next track":
@@ -302,9 +333,11 @@ class HandMouseController:
                 pyautogui.press('volumedown')
             elif normalized_action == "mute/unmute":
                 pyautogui.press('volumemute')
+            elif action.startswith('http://') or action.startswith('https://'):
+                webbrowser.open(action)
             else:
-                # If action is a custom command or application
-                subprocess.Popen(action)
+                # Attempt to execute the action as a command
+                subprocess.Popen(action, shell=True)
         except Exception as e:
             print(f"Error executing action '{action}': {e}")
 
@@ -325,21 +358,31 @@ class HandMouseController:
 
                 if results.multi_hand_landmarks:
                     hand_landmarks = results.multi_hand_landmarks[0]
+                    hand_handedness = results.multi_handedness[0]
+                    label = hand_handedness.classification[0].label  # 'Left' or 'Right'
+                    self.hand_label = label
+
                     thumb_tip, index_tip = self.get_landmark_positions(hand_landmarks)
 
                     # Move cursor
                     self.move_cursor(index_tip)
 
-                    # Detect gestures
+                    # Handle click and drag first
+                    self.handle_gesture(thumb_tip, index_tip)
+
+                    # Then detect other gestures
                     if self.detect_middle_finger_gesture():
                         print("Middle finger gesture detected - Exiting")
                         break
                     elif self.detect_shaka_sign():
                         self.take_screenshot()
+                    elif self.detect_curled_fist():
+                        self.fist_detected_seconds += 0.1  # Increment counter if fist is detected
+                        if self.fist_detected_seconds >= 42:  # Check if the fist has been held for 42 seconds
+                            webbrowser.open("https://blacklivesmatter.com/")  # Easter Egg
+                            self.fist_detected_seconds = 0  # Reset the counter after opening the website
                     else:
                         self.detect_custom_gestures()
-                        # Handle click and drag
-                        self.handle_gesture(thumb_tip, index_tip)
 
                     # Draw hand landmarks
                     self.mp_draw.draw_landmarks(img, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
@@ -355,6 +398,8 @@ class HandMouseController:
             self.cap.release()
             cv2.destroyAllWindows()
 
+
+# GUI functions for configuration
 def configure_gestures():
     """Opens a GUI for users to assign actions to gestures."""
     config_window = tk.Toplevel()  # Use Toplevel instead of ttkbs.Window
@@ -377,28 +422,52 @@ def configure_gestures():
         "Volume Up",
         "Volume Down",
         "Mute/Unmute",
+        "Other..."
     ]
 
-    gesture_actions = {}
+    default_gesture_actions = {
+        "2": "Open Calculator",
+        "3": "Open Snipping Tool",
+        "4": "Open Notepad"
+    }
 
     # Load existing configuration if available
     config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
-    print(f"Configuration file path (saving): {config_file}")
-    if os.path.exists(config_file):
+    if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
         with open(config_file, 'r') as f:
-            gesture_actions = json.load(f)
+            try:
+                gesture_actions = json.load(f)
+            except JSONDecodeError:
+                print("Invalid JSON in gesture_config.json. Loading default configuration.")
+                messagebox.showwarning("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")
+                gesture_actions = default_gesture_actions.copy()
+                # Save default configuration back to the file
+                with open(config_file, 'w') as fw:
+                    json.dump(gesture_actions, fw)
     else:
-        # Initialize default configuration
-        gesture_actions = {str(g): actions[0] for g in gestures}
+        # File doesn't exist or is empty, use default configuration
+        gesture_actions = default_gesture_actions.copy()
+        # Save default configuration to the file
+        with open(config_file, 'w') as f:
+            json.dump(gesture_actions, f)
 
     dropdowns = {}
 
     def save_configuration():
-        print("Save configuration function called")
         # Save the selected actions
         for g in gestures:
             selected_action = dropdowns[g].get()
-            gesture_actions[str(g)] = selected_action
+            if selected_action == "Other...":
+                # Prompt user for custom input
+                custom_action = simpledialog.askstring("Custom Action", f"Enter custom action for gesture {g}:")
+                if custom_action:
+                    gesture_actions[str(g)] = custom_action
+                else:
+                    # If no input, default to the previous action
+                    gesture_actions[str(g)] = gesture_actions.get(str(g), actions[0])
+                    dropdowns[g].set(gesture_actions[str(g)])
+            else:
+                gesture_actions[str(g)] = selected_action
         try:
             with open(config_file, 'w') as f:
                 json.dump(gesture_actions, f)
@@ -423,6 +492,7 @@ def configure_gestures():
     save_button.pack(pady=20)
 
     config_window.mainloop()
+
 
 
 def handle_login_gui(username):
