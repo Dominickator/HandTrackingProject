@@ -10,9 +10,7 @@ The hand gestures recognized in this project trigger specific computer actions:
 - **Index Finger and Thumb Pinch:** Simulates a left-click.
 - **Shaka Gesture:** Captures a screenshot of the current screen.
 - **Middle Finger Gesture:** Quits the application.
-
-### Gesture Overview:
-![Gestures Overview](./gestures.png)
+- **Customizable Gestures for Two, Three, and Four fingers up!**
 
 ## Requirements
 
