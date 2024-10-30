@@ -61,7 +61,7 @@ class HandMouseController:
         self.dragging = False
         self.touch_start_time = None
         self.click_threshold = 0.1  # seconds
-        self.drag_threshold = 0.7  # seconds
+        self.drag_threshold = 0.4  # seconds
         self.button_threshold = 10  # Threshold for imaginary button
 
         # Screenshot state variables
