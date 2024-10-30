@@ -8,9 +8,24 @@ import webbrowser
 from tkinter import simpledialog
 import tkinter as tk
 from tkinter import messagebox, ttk
+import requests
+import ttkbootstrap as ttkbs
 from threading import Thread
 import json  # To store configurations
 import subprocess  # To run applications
+
+# Imports for firebase integration
+import firebase_admin
+from firebase_admin import credentials, auth
+
+from ttkbootstrap.scrolled import ScrolledFrame
+from ttkbootstrap.toast import ToastNotification
+from ttkbootstrap.tooltip import ToolTip
+from ttkbootstrap.widgets import DateEntry, Floodgauge, Meter
+
+# Initialize Firebase with the certificate
+cred = credentials.Certificate("config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json")
+firebase_admin.initialize_app(cred)
 
 class HandMouseController:
     def __init__(self, gesture_actions):
@@ -396,12 +411,16 @@ class HandMouseController:
 # GUI functions for configuration
 def configure_gestures():
     """Opens a GUI for users to assign actions to gestures."""
-    config_window = tk.Tk()
-    config_window.title("Configure Gestures")
-    config_window.geometry("400x400")
+    config_window = tk.Toplevel()  # Use Toplevel instead of ttkbs.Window
+    config_window.title('Configure Gestures')
+    config_window.geometry('640x480')
 
-    gestures = [2, 3, 4]
-    actions = [  # Updated actions list with "Other..."
+    # Title for the configuration window
+    title_label = ttkbs.Label(config_window, text='Configure Gestures', font=('Arial', 24, 'bold'))
+    title_label.pack(pady=20)
+
+    gestures = [2, 3, 4]  # Number of fingers up to configure
+    actions = [
         "Open Snipping Tool",
         "Open Calculator",
         "Open Notepad",
@@ -427,7 +446,7 @@ def configure_gestures():
         with open(config_file, 'r') as f:
             try:
                 gesture_actions = json.load(f)
-            except JSONDecodeError:
+            except json.JSONDecodeError:
                 print("Invalid JSON in gesture_config.json. Loading default configuration.")
                 messagebox.showwarning("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")
                 gesture_actions = default_gesture_actions.copy()
@@ -461,70 +480,102 @@ def configure_gestures():
         try:
             with open(config_file, 'w') as f:
                 json.dump(gesture_actions, f)
-            messagebox.showinfo("Configuration Saved", "Your gesture configurations have been saved.")
+            toast = ToastNotification("Configuration Saved", "Gestures configuration saved successfully.", duration=3000, bootstyle='success', position = (50, 50, 'ne'))
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save configurations: {e}")
-            print(f"Error saving configurations: {e}")
+            toast = ToastNotification("Configuration Error", f"Failed to save configurations: {e}", duration=3000, bootstyle='danger', position = (50, 50, 'ne'))
+            print(f"Failed to save configurations: {e}")
+        toast.show_toast()
         config_window.destroy()
 
     for g in gestures:
-        ttk.Label(config_window, text=f"Gesture: {g} Fingers Up").pack(pady=5)
-        default_value = gesture_actions.get(str(g), actions[0])
-        combobox = ttk.Combobox(config_window, values=actions, state='readonly')
-        # Include custom action if not in actions
-        if default_value not in actions:
-            combobox['values'] = actions + [default_value]
-        combobox.set(default_value)
-        combobox.pack(pady=5)
-        dropdowns[g] = combobox
+        label = ttkbs.Label(config_window, text=f'Gesture: {g} Fingers Up', font=('Arial', 12))
+        label.pack(pady=5)
 
-    ttk.Button(config_window, text="Save", command=save_configuration).pack(pady=20)
+        default_value = gesture_actions.get(str(g), actions[0])
+        dropdown = ttkbs.Combobox(config_window, values=actions, state='readonly', bootstyle='primary')
+        dropdown.set(default_value)
+        dropdown.pack(pady=5)
+        dropdowns[g] = dropdown
+
+    save_button = ttkbs.Button(config_window, text='Save', bootstyle='primary', command=save_configuration)
+    save_button.pack(pady=20)
+
     config_window.mainloop()
 
+# Define the login function
+def login(email, password):
+    api_key = "AIzaSyCp1nDe4uciVKuJn0G-Io8JVQ5Tsz869OM"  # Replace with your actual API key
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
+    payload = {
+        "email": email,
+        "password": password,
+        "returnSecureToken": True
+    }
+    response = requests.post(url, json=payload)
+    
+    if response.status_code == 200:
+        print("User authenticated successfully:", email)
+        return True
+    else:
+        print("Failed to authenticate:", response.json().get("error", {}).get("message"))
+        return False
 
+def handle_login_gui(username, password):
+    # Handle login using Firebase
+    if login(username, password):
+        # Login successful, open main application window
+        open_main_window(username)
+    else:
+        messagebox.showerror("Login Failed", "Invalid username or password. Please try again.")
 
-def handle_login_gui(username):
-    # Destroy the login window and create the main application window
-    login_window.destroy()
-    app_window = tk.Tk()
-    app_window.title("Hand Gesture Mouse Controller")
-    app_window.geometry("640x480")  # Set the resolution of the main window
+def open_main_window(username):
+    # Hide the login window instead of destroying it
+    window.withdraw()
 
-    style = ttk.Style()
-    style.configure("TLabel", font=("Verdana", 15, "bold"))
-    style.configure("TButton", font=("Verdana", 12), padding=10)
+    # Create the main application window
+    app_window = tk.Toplevel()
+    app_window.title('Hand Gesture Mouse Controller')
+    app_window.geometry('640x480')
 
-    # Create a label to display the username
-    ttk.Label(app_window, text=f"Welcome, {username}!", padding=(20, 10)).pack()
+    label = ttkbs.Label(app_window, text=f'Welcome, {username}!', font=('Arial', 24, 'bold'))
+    label.pack(pady=20)
 
-    # Create a button to start the hand gesture controller
-    start_button = ttk.Button(app_window, text="Start Hand Gesture Controller", command=lambda: start_hand_mouse_controller(app_window))
+    start_button = ttkbs.Button(app_window, text='Start Hand Gesture Controller', bootstyle='primary',
+                                command=lambda: start_hand_mouse_controller(app_window))
     start_button.pack(pady=20)
 
-    # Create a button to configure gestures
-    config_button = ttk.Button(app_window, text="Configure Gestures", command=configure_gestures)
+    config_button = ttkbs.Button(app_window, text='Configure Gestures', bootstyle='primary', command=configure_gestures)
     config_button.pack(pady=10)
 
-    # Create a button to view the hand gesture guide
-    view_button = ttk.Button(app_window, text="View Hand Gesture Guide", command=view_gestures)
+    view_button = ttkbs.Button(app_window, text='View Hand Gesture Guide', bootstyle='primary', command=view_gestures)
     view_button.pack(pady=10)
+
+    def on_app_window_close():
+        # Make sure the main window is destroyed when the app window is closed
+        app_window.destroy()
+        window.destroy()
+
+    # Bind the close event to ensure the main window is properly destroyed
+    app_window.protocol("WM_DELETE_WINDOW", on_app_window_close)
 
     app_window.mainloop()
 
 def start_hand_mouse_controller(app_window):
+    # Hide the app window temporarily while the loading window is shown
+    app_window.withdraw()
+
     # Create a loading window
     loading_window = tk.Toplevel(app_window)
-    loading_window.title("Loading")
-    loading_window.geometry("400x125")
-    
-    # Create a label to indicate loading
-    ttk.Label(loading_window, text="Starting camera...", padding=(25, 15)).pack()
-    
-    # Create a progress bar
-    progress_bar = ttk.Progressbar(loading_window, mode='indeterminate')
-    progress_bar.pack(pady=10, padx=10, fill=tk.X)
+    loading_window.title('Loading')
+    loading_window.geometry('400x125')
+
+    label = ttkbs.Label(loading_window, text='Starting camera...', font=('Arial', 18, 'bold'))
+    label.pack(pady=20)
+
+    progress_bar = ttkbs.Progressbar(loading_window, mode='indeterminate', bootstyle='primary-striped', length=300)
+    progress_bar.pack(pady=10)
     progress_bar.start()
-    
+
     # Function to start the hand mouse controller
     def start_controller():
         # Load gesture configurations
@@ -533,59 +584,79 @@ def start_hand_mouse_controller(app_window):
         if os.path.exists(config_file):
             with open(config_file, 'r') as f:
                 gesture_actions = json.load(f)
-            # Do not convert keys to integers
-            # gesture_actions = {int(k): v for k, v in gesture_actions.items()}
         else:
             gesture_actions = {}
 
+        # Initialize the HandMouseController
         controller = HandMouseController(gesture_actions)
-        loading_window.destroy()
+        loading_window.destroy()  # Close the loading window
+        app_window.deiconify()  # Show the app window again after loading
         controller.run()
-        app_window.destroy()
+        app_window.destroy()  # Destroy the app window when the controller finishes
 
-
-    
     # Start the controller in a separate thread to avoid blocking the UI
     Thread(target=start_controller).start()
 
-def view_gestures():
-    # Create a new window to display the gesture guide
-    gestures_window = tk.Toplevel()
-    gestures_window.title("Hand Gesture Guide")
-    gestures_window.geometry("640x480")  # Set the resolution of the gestures window
 
-    # Show the gesture guide image
-    # Ensure you have an image file named 'gestures.png' in the same directory
-    gestures_image = tk.PhotoImage(file="gestures.png")
-    gestures_label = ttk.Label(gestures_window, image=gestures_image)
-    gestures_label.image = gestures_image  # Keep a reference
-    gestures_label.pack()
+def view_gestures():
+    # Create a gestures guide window
+    gestures_window = tk.Toplevel()
+    gestures_window.title('Hand Gesture Guide')
+    gestures_window.geometry('640x480')
+
+    label = ttkbs.Label(gestures_window, text='Hand Gesture Guide', font=('Arial', 24, 'bold'))
+    label.pack(pady=20)
+
+    gesture_frame = ttkbs.Frame(gestures_window, padding=10)
+    gesture_frame.pack(expand=True, fill=tk.BOTH)
+
+    # Load the gesture configurations from file
+    config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            gesture_actions = json.load(f)
+    else:
+        gesture_actions = {}
+
+    gesture_descriptions = {
+        "1 Finger Up": "Move Cursor",
+        "2 Fingers Up": gesture_actions.get("2", "Not Configured"),
+        "3 Fingers Up": gesture_actions.get("3", "Not Configured"),
+        "4 Fingers Up": gesture_actions.get("4", "Not Configured"),
+        "Thumb and Index Touching": "Click/Drag",
+        "Middle Finger Up": "Exit Application",
+        "Shaka Sign": "Take Screenshot"
+    }
+
+    for gesture, description in gesture_descriptions.items():
+        label = ttkbs.Label(gesture_frame, text=f'{gesture}: {description}', font=('Arial', 12))
+        label.pack(pady=5, anchor=tk.W)
 
     gestures_window.mainloop()
 
+
 if __name__ == "__main__":
-    # Create the login screen
-    login_window = tk.Tk()
-    login_window.title("Login Screen")
-    login_window.geometry("640x480")  # Set the resolution of the login window
+    window = ttkbs.Window(themename='darkly')  # Main window
+    window.title('Hand Gesture Mouse Controller')
+    window.geometry('640x480')
 
-    style = ttk.Style()
-    style.configure("TLabel", font=("Verdana", 12))
-    style.configure("TButton", font=("Verdana", 12), padding=10)
-    style.configure("TEntry", font=("Verdana", 12))
+    label = ttkbs.Label(window, text='Login', font=('Arial', 24, 'bold'))
+    label.pack(pady=20)
 
-    frame = ttk.Frame(login_window, padding="20")
-    frame.pack(expand=True)
+    username_label = ttkbs.Label(window, text='Username', font=('Arial', 14))
+    username_label.pack(pady=5)
 
-    ttk.Label(frame, text="Username:").pack(pady=10)
-    username_entry = ttk.Entry(frame, width=40)
-    username_entry.pack(pady=10, fill=tk.X)
+    username_entry = ttkbs.Entry(window, font=('Arial', 12))
+    username_entry.pack(pady=5)
 
-    ttk.Label(frame, text="Password:").pack(pady=10)
-    password_entry = ttk.Entry(frame, width=40, show="*")
-    password_entry.pack(pady=10, fill=tk.X)
+    password_label = ttkbs.Label(window, text='Password', font=('Arial', 14))
+    password_label.pack(pady=5)
 
-    login_button = ttk.Button(frame, text="Login", command=lambda: handle_login_gui(username_entry.get()))
-    login_button.pack(pady=20)
+    password_entry = ttkbs.Entry(window, font=('Arial', 12), show='*')
+    password_entry.pack(pady=5)
 
-    login_window.mainloop()
+    login_button = ttkbs.Button(window, text='Login', bootstyle='primary',
+                                command=lambda: handle_login_gui(username_entry.get(), password_entry.get()))
+    login_button.pack(padx=10, pady=10)
+
+    window.mainloop()

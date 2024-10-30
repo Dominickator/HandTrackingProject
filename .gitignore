@@ -6,6 +6,11 @@ __pycache__/
 # Gestures JSON File
 gesture_config.json
 
+# Firebase JSON File
+config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json
+config\capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json
+capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json
+
 # C extensions
 *.so
 
