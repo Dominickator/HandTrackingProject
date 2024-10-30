@@ -61,7 +61,8 @@ class HandMouseController:
         self.dragging = False
         self.touch_start_time = None
         self.click_threshold = 0.1  # seconds
-        self.drag_threshold = 0.5  # seconds
+        self.drag_threshold = 0.7  # seconds
+        self.button_threshold = 10  # Threshold for imaginary button
 
         # Screenshot state variables
         self.screenshot_cooldown = 2  # seconds
@@ -139,16 +140,12 @@ class HandMouseController:
 
     def handle_gesture(self, thumb_tip, index_tip):
         """Handles click and drag events based on thumb and index fingertip positions."""
-        # No longer checking the state of other fingers
-        # fingers = self.fingers_up()  # This line can be removed if not used elsewhere
-
         # Calculate the midpoint between thumb and index finger
         midpoint = (
             (thumb_tip[0] + index_tip[0]) // 2,
             (thumb_tip[1] + index_tip[1]) // 2
         )
-        # Define a threshold distance for the imaginary button
-        button_threshold = 30  # Adjust this value as needed
+        # No need to define button_threshold here
 
         # Calculate distances from thumb tip and index tip to the midpoint
         thumb_distance = np.linalg.norm(np.array(thumb_tip) - np.array(midpoint))
@@ -158,7 +155,7 @@ class HandMouseController:
         print(f"Index distance to midpoint: {index_distance}")
 
         # Check if both fingers are close to the imaginary button
-        if thumb_distance < button_threshold and index_distance < button_threshold:
+        if thumb_distance < self.button_threshold and index_distance < self.button_threshold:
             print("Both fingers are touching the imaginary button")  # Debugging
             if self.touch_start_time is None:
                 self.touch_start_time = time.time()
@@ -189,18 +186,25 @@ class HandMouseController:
             self.touch_start_time = None
 
 
+
     def fingers_up(self):
         """Determines which fingers are up and returns a list."""
         fingers = []
         threshold = 5  # Adjust as needed
 
-        # Thumb detection using y-coordinates
-        thumb_tip_y = self.lm_list[4][1]
-        thumb_ip_y = self.lm_list[3][1]
-        if thumb_ip_y - thumb_tip_y > threshold:
-            fingers.append(1)  # Thumb is up
-        else:
-            fingers.append(0)  # Thumb is down
+        # Thumb detection using x-coordinates
+        thumb_tip_x = self.lm_list[4][0]
+        thumb_mcp_x = self.lm_list[2][0]
+        if self.hand_label == 'Right':
+            if thumb_tip_x > thumb_mcp_x + threshold:
+                fingers.append(1)  # Thumb is up
+            else:
+                fingers.append(0)  # Thumb is down
+        else:  # Left hand
+            if thumb_tip_x < thumb_mcp_x - threshold:
+                fingers.append(1)  # Thumb is up
+            else:
+                fingers.append(0)  # Thumb is down
 
         # Fingers (Index to Pinky)
         tips_ids = [8, 12, 16, 20]
@@ -209,13 +213,14 @@ class HandMouseController:
         for tip_id, pip_id in zip(tips_ids, pip_ids):
             tip_y = self.lm_list[tip_id][1]
             pip_y = self.lm_list[pip_id][1]
-            if pip_y - tip_y > threshold:
+            if tip_y < pip_y - threshold:
                 fingers.append(1)  # Finger is up
             else:
                 fingers.append(0)  # Finger is down
 
         print(f"Fingers Up: {fingers}")  # Debugging
         return fingers  # [Thumb, Index, Middle, Ring, Pinky]
+
 
 
 
@@ -384,12 +389,28 @@ class HandMouseController:
                     # Handle click and drag first
                     self.handle_gesture(thumb_tip, index_tip)
 
-                    # Draw the imaginary button (for visualization)
+                    # Calculate midpoint for visualization
                     midpoint = (
                         (thumb_tip[0] + index_tip[0]) // 2,
                         (thumb_tip[1] + index_tip[1]) // 2
                     )
-                    cv2.circle(img, midpoint, 10, (0, 255, 0), 2)  # Green circle
+
+                    # Draw the imaginary button (for visualization)
+                    cv2.circle(img, midpoint, self.button_threshold, (0, 255, 0), 2)  # Green circle
+
+                    # Detect other gestures
+                    if self.detect_middle_finger_gesture():
+                        print("Middle finger gesture detected - Exiting")
+                        break
+                    elif self.detect_shaka_sign():
+                        self.take_screenshot()
+                    elif self.detect_curled_fist():
+                        self.fist_detected_seconds += 0.1  # Increment counter if fist is detected
+                        if self.fist_detected_seconds >= 42:  # Easter Egg
+                            webbrowser.open("https://blacklivesmatter.com/")
+                            self.fist_detected_seconds = 0
+                    else:
+                        self.detect_custom_gestures()
 
                     # Draw hand landmarks
                     self.mp_draw.draw_landmarks(img, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
@@ -404,6 +425,8 @@ class HandMouseController:
             # Release resources
             self.cap.release()
             cv2.destroyAllWindows()
+
+
 
 
 # GUI functions for configuration
