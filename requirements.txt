@@ -1,4 +1,7 @@
 opencv-python
-mediapipe
 numpy
+mediapipe
 pyautogui
+requests
+ttkbootstrap
+firebase-admin
