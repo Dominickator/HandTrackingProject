@@ -3,8 +3,19 @@ import queue
 import sys
 import sounddevice as sd
 from pyautogui import write
+import json
 
 from vosk import Model, KaldiRecognizer
+
+def result_to_text(jsonResult, wfAccpet):
+    tmpData = json.loads(jsonResult)
+    if wfAccpet:
+        textData = json.dumps(tmpData['text'])
+    else:
+        textData = json.dumps(tmpData['partial'])
+    
+    textData = textData.replace('"', '')
+    return textData
 
 q = queue.Queue()
 
@@ -36,34 +47,42 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "-d", "--device", type=int_or_str,
     help="input device (numeric ID or substring)")
+parser.add_argument(
+    "-s","--samplerate", type=int_or_str
+)
+args = parser.parse_known_args()
 
 try:
-    device_info = sd.query_devices(args.device, "input")
+    device_info = sd.query_devices(args[0].device, "input")
     # soundfile expects an int, sounddevice provides a float:
-    args.samplerate = int(device_info["default_samplerate"])
+    args[0].samplerate = int(device_info["default_samplerate"])
     model = Model(lang="en-us")
 
     buffer_queue = queue.Queue()
 
-    with sd.RawInputStream(samplerate=args.samplerate, blocksize = 8000, device=args.device,
+    with sd.RawInputStream(samplerate=args[0].samplerate, blocksize = 8000, device=args[0].device,
             dtype="int16", channels=1, callback=callback):
         print("#" * 80)
         print("Press Ctrl+C to stop the recording")
         print("#" * 80)
 
-        rec = KaldiRecognizer(model, args.samplerate)
+        rec = KaldiRecognizer(model, args[0].samplerate)
         while True:
             data = q.get()
-            if rec.AcceptWaveform(data):
-                print(f"Waveform accepted, recognized word/phrase: {rec.Result()}")
-                buffer_queue.put(rec.Result())
+            wfAccepted = rec.AcceptWaveform(data)
+            if wfAccepted:
+                fullResult = result_to_text(rec.Result(),wfAccepted)
+                if fullResult != '':
+                    buffer_queue.put(fullResult)
+                    print(f"Waveform accepted, recognized word/phrase: {fullResult}")
             else:
-                print(f"Waveform partially accepted, recognized word/phrase: {rec.PartialResult()}")
-                buffer_queue.put(rec.PartialResult())
+                parResult = result_to_text(rec.PartialResult(),wfAccepted)
+                if parResult != '':
+                    #buffer_queue.put(parResult)
+                    print(f"Waveform partially accepted, recognized word/phrase: {parResult}")
             
             while not buffer_queue.empty():
                 write(buffer_queue.get())
-
 
 
 except KeyboardInterrupt:
