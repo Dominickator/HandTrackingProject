@@ -39,6 +39,18 @@ parser.add_argument(
 args, remaining = parser.parse_known_args()
 if args.list_devices:
     print(sd.query_devices())
+    
+    
+    
+    devList = list(sd.query_devices())
+    devNames = []
+    for dev in devList:
+        devName = dev['name']
+        devNames.append(devName)
+
+    
+    
+    
     parser.exit(0)
 parser = argparse.ArgumentParser(
     description=__doc__,

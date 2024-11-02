@@ -14,6 +14,8 @@ from threading import Thread
 import json  # To store configurations
 import subprocess  # To run applications
 
+import sounddevice
+
 # Imports for firebase integration
 import firebase_admin
 from firebase_admin import credentials, auth
@@ -502,6 +504,73 @@ def configure_gestures():
 
     config_window.mainloop()
 
+def configure_stt():
+    config_window = tk.Toplevel()  # Use Toplevel instead of ttkbs.Window
+    config_window.title('Configure Speech-to-Text')
+    config_window.geometry('640x480')
+
+    # Title for the configuration window
+    title_label = ttkbs.Label(config_window, text='Configure Speech-to-Text', font=('Arial', 24, 'bold'))
+    title_label.pack(pady=20)
+
+    devList = list(sounddevice.query_devices())
+    devNames = []
+    for dev in devList:
+        devName = dev['name']
+        devNames.append(devName)
+
+    default_sound_settings = {
+        "device": 0
+    }
+
+    # Load existing configuration if available
+    config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'stt_config.json')
+    if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
+        with open(config_file, 'r') as f:
+            try:
+                stt_data = json.load(f)
+            except json.JSONDecodeError:
+                print("Invalid JSON in stt_config.json. Loading default configuration.")
+                messagebox.showwarning("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")
+                stt_data = default_sound_settings.copy()
+                # Save default configuration back to the file
+                with open(config_file, 'w') as fw:
+                    json.dump(stt_data, fw)
+    else:
+        # File doesn't exist or is empty, use default configuration
+        stt_data = default_sound_settings.copy()
+        # Save default configuration to the file
+        with open(config_file, 'w') as f:
+            json.dump(stt_data, f)
+
+    def save_configuration():
+        selected_device = dropdown.get()
+        default_sound_settings['device'] = selected_device
+        try:
+            with open(config_file, 'w') as f:
+                json.dump(default_sound_settings, f)
+            toast = ToastNotification("Configuration Saved", "Gestures configuration saved successfully.", duration=3000, bootstyle='success', position = (50, 50, 'ne'))
+        except Exception as e:
+            toast = ToastNotification("Configuration Error", f"Failed to save settings: {e}", duration=3000, bootstyle='danger', position = (50, 50, 'ne'))
+            print(f"Failed to save settings: {e}")
+        toast.show_toast()
+        config_window.destroy()
+
+    
+    label = ttkbs.Label(config_window, text=f"Choose Input Device:", font=('Arial', 12))
+    label.pack(pady=5)
+
+    default_value = default_sound_settings.get("name", devNames[0])
+    dropdown = ttkbs.Combobox(config_window, values=devNames, state='readonly', bootstyle='primary')
+    dropdown.set(default_value)
+    dropdown.pack(pady=5)
+    #dropdowns[devNames] = dropdown
+
+    save_button = ttkbs.Button(config_window, text='Save', bootstyle='primary', command=save_configuration)
+    save_button.pack(pady=20)
+
+    config_window.mainloop()
+
 # Define the login function
 def login(email, password):
     api_key = "AIzaSyCp1nDe4uciVKuJn0G-Io8JVQ5Tsz869OM"  # Replace with your actual API key
@@ -545,6 +614,9 @@ def open_main_window(username):
     start_button.pack(pady=20)
 
     config_button = ttkbs.Button(app_window, text='Configure Gestures', bootstyle='primary', command=configure_gestures)
+    config_button.pack(pady=10)
+
+    config_button = ttkbs.Button(app_window, text='Configure Speech-To-Text', bootstyle='primary', command=configure_stt)
     config_button.pack(pady=10)
 
     view_button = ttkbs.Button(app_window, text='View Hand Gesture Guide', bootstyle='primary', command=view_gestures)
