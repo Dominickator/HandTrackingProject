@@ -10,11 +10,12 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 import requests
 import ttkbootstrap as ttkbs
-from threading import Thread
+from threading import Thread, Event
 import json  # To store configurations
 import subprocess  # To run applications
 
 import sounddevice
+import speech_to_text as stt
 
 # Imports for firebase integration
 import firebase_admin
@@ -25,8 +26,11 @@ from ttkbootstrap.toast import ToastNotification
 from ttkbootstrap.tooltip import ToolTip
 from ttkbootstrap.widgets import DateEntry, Floodgauge, Meter
 
+#tmp = os.listdir("HandTrackingProject/config")
+
+
 # Initialize Firebase with the certificate
-cred = credentials.Certificate("config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json")
+cred = credentials.Certificate("HandTrackingProject/config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json")
 firebase_admin.initialize_app(cred)
 
 class HandMouseController:
@@ -354,8 +358,6 @@ class HandMouseController:
 
 
 
-
-
     def run(self):
         """Main loop to process video frames and control the cursor."""
         try:
@@ -408,6 +410,32 @@ class HandMouseController:
             # Release resources
             self.cap.release()
             cv2.destroyAllWindows()
+
+def activate_stt():
+    global stop_event
+    stop_event = Event()
+    run_stt(stop_event)
+
+def run_stt(stop_event:Event):
+    #Loading which sound device to use from config file
+    config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'stt_config.json')
+    with open(config_file, 'r') as f:
+        try:
+            stt_data = json.load(f)
+            device = stt_data['device']
+            toast = ToastNotification("Speech-To-Text Active", f"Speech is being translated to text", duration=3000, bootstyle='success', position = (50, 50, 'ne'))
+        except json.JSONDecodeError:
+            toast = ToastNotification("Configuration Error", f"Failed to load Speech-To-Text Configuration. Is it configured correctly?", duration=3000, bootstyle='danger', position = (50, 50, 'ne'))
+    toast.show_toast()
+    global stt_thread
+    stt_thread = Thread(name="stt_thread",target=stt.run_stt, daemon=True, args=(device, stop_event))
+    stt_thread.start()
+
+def deactivate_stt():
+    global stt_thread
+    global stop_event
+    stop_event.set()
+    stt_thread.join()
 
 
 # GUI functions for configuration
@@ -515,12 +543,14 @@ def configure_stt():
 
     devList = list(sounddevice.query_devices())
     devNames = []
+    devDict = {}
     for dev in devList:
-        devName = dev['name']
+        devName = f"[{dev['index']}] {dev['name']}"
         devNames.append(devName)
+        devDict[devName] = dev['index']
 
     default_sound_settings = {
-        "device": 0
+        "device": ''
     }
 
     # Load existing configuration if available
@@ -544,7 +574,7 @@ def configure_stt():
             json.dump(stt_data, f)
 
     def save_configuration():
-        selected_device = dropdown.get()
+        selected_device = devDict[dropdown.get()]#devName
         default_sound_settings['device'] = selected_device
         try:
             with open(config_file, 'w') as f:
@@ -560,11 +590,11 @@ def configure_stt():
     label = ttkbs.Label(config_window, text=f"Choose Input Device:", font=('Arial', 12))
     label.pack(pady=5)
 
-    default_value = default_sound_settings.get("name", devNames[0])
+    default_value = default_sound_settings.get("name", devName[0])
     dropdown = ttkbs.Combobox(config_window, values=devNames, state='readonly', bootstyle='primary')
     dropdown.set(default_value)
     dropdown.pack(pady=5)
-    #dropdowns[devNames] = dropdown
+
 
     save_button = ttkbs.Button(config_window, text='Save', bootstyle='primary', command=save_configuration)
     save_button.pack(pady=20)
@@ -615,6 +645,15 @@ def open_main_window(username):
 
     config_button = ttkbs.Button(app_window, text='Configure Gestures', bootstyle='primary', command=configure_gestures)
     config_button.pack(pady=10)
+
+    #DEBUG
+    config_button = ttkbs.Button(app_window, text='Activate STT', bootstyle='primary', command=activate_stt)
+    config_button.pack(pady=10)
+
+    #DEBUG
+    config_button = ttkbs.Button(app_window, text='Deactivate STT', bootstyle='primary', command=deactivate_stt)
+    config_button.pack(pady=10)
+
 
     config_button = ttkbs.Button(app_window, text='Configure Speech-To-Text', bootstyle='primary', command=configure_stt)
     config_button.pack(pady=10)
