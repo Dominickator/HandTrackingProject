@@ -30,7 +30,7 @@ from ttkbootstrap.widgets import DateEntry, Floodgauge, Meter
 
 
 # Initialize Firebase with the certificate
-cred = credentials.Certificate("HandTrackingProject/config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json")
+cred = credentials.Certificate("config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json")
 firebase_admin.initialize_app(cred)
 
 class HandMouseController:
