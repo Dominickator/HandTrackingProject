@@ -2,3 +2,8 @@ opencv-python
 mediapipe
 numpy
 pyautogui
+pyaudio
+vosk
+sounddevice
+ttkbootstrap
+firebase_admin
