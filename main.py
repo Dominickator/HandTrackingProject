@@ -30,7 +30,7 @@ from ttkbootstrap.widgets import DateEntry, Floodgauge, Meter
 
 
 # Initialize Firebase with the certificate
-cred = credentials.Certificate("HandTrackingProject/config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json")
+cred = credentials.Certificate("config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json")
 firebase_admin.initialize_app(cred)
 
 class HandMouseController:
@@ -603,7 +603,7 @@ def configure_stt():
 
 # Define the login function
 def login(email, password):
-    api_key = "AIzaSyCp1nDe4uciVKuJn0G-Io8JVQ5Tsz869OM"  # Replace with your actual API key
+    api_key = "AIzaSyCp1nDe4uciVKuJn0G-Io8JVQ5Tsz869OM"
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
     payload = {
         "email": email,
@@ -619,17 +619,20 @@ def login(email, password):
         print("Failed to authenticate:", response.json().get("error", {}).get("message"))
         return False
 
-def handle_login_gui(username, password):
+def handle_login_gui(username, password, login_window = None):
     # Handle login using Firebase
     if login(username, password):
         # Login successful, open main application window
-        open_main_window(username)
+        open_main_window(username, login_window)
     else:
         messagebox.showerror("Login Failed", "Invalid username or password. Please try again.")
 
-def open_main_window(username):
+def open_main_window(username, login_window=None):
     # Hide the login window instead of destroying it
     window.withdraw()
+
+    if login_window:
+        login_window.destroy()
 
     # Create the main application window
     app_window = tk.Toplevel()
@@ -741,33 +744,163 @@ def view_gestures():
 
     for gesture, description in gesture_descriptions.items():
         label = ttkbs.Label(gesture_frame, text=f'{gesture}: {description}', font=('Arial', 12))
-        label.pack(pady=5, anchor=tk.W)
+        label.pack(pady=5)
 
     gestures_window.mainloop()
 
+def handle_firsttime():
+    # Hide the login window instead of destroying it
+    window.withdraw()
+    # Write the firsttime file to indicate that the user has logged in
+    firsttime_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'firsttime.txt')
+    with open(firsttime_file, 'w') as f:
+        f.write('no')
+
+    # Open the first window, which is the hand movement window
+    movement_window()
+
+def movement_window():
+    # Create a window showing the user how to click
+    movement_window = tk.Toplevel()
+    movement_window.title('Movement Guide')
+    movement_window.geometry('640x480')
+
+    window.withdraw()
+
+    label = ttkbs.Label(movement_window, text='Movement Guide', font=('Arial', 24, 'bold'))
+    label.pack(pady=20)
+
+    label = ttkbs.Label(movement_window, text='1. Use the pointer finger to move the cursor', font=('Arial', 12))
+    label.pack(pady=5)
+
+    click_gif = ttkbs.PhotoImage(file='images/tap.png')
+    click_label = ttkbs.Label(movement_window, image=click_gif)
+    click_label.pack(pady=20)
+
+    next_button = ttkbs.Button(movement_window, text='Next', bootstyle='primary', command=lambda: click_window(movement_window))
+    next_button.pack(pady=10)
+
+    def on_app_window_close():
+        # Make sure the main window is destroyed when the app window is closed
+        movement_window.destroy()
+        window.destroy()
+
+    # Bind the close event to ensure the main window is properly destroyed
+    movement_window.protocol("WM_DELETE_WINDOW", on_app_window_close)
+
+    movement_window.mainloop()
+
+def click_window(movement_window):
+    # Create a window showing the user how to click
+    click_window = tk.Toplevel()
+    click_window.title('Click Guide')
+    click_window.geometry('640x480')
+
+    label = ttkbs.Label(click_window, text='Click Guide', font=('Arial', 24, 'bold'))
+    label.pack(pady=20)
+
+    label = ttkbs.Label(click_window, text='2. Touch the thumb and index finger to click or drag', font=('Arial', 12))
+    label.pack(pady=5)
+
+    click_gif = ttkbs.PhotoImage(file='images/measure.png')
+    click_label = ttkbs.Label(click_window, image=click_gif)
+    click_label.pack(pady=20)
+
+    movement_window.destroy()
+
+    next_button = ttkbs.Button(click_window, text='Next', bootstyle='primary', command=lambda: screenshot_window(click_window))
+    next_button.pack(pady=10)
+
+    click_window.mainloop()
+
+def screenshot_window(click_window):
+    # Create a window showing the user how to take a screenshot
+    screenshot_window = tk.Toplevel()
+    screenshot_window.title('Screenshot Guide')
+    screenshot_window.geometry('640x480')
+
+    label = ttkbs.Label(screenshot_window, text='Screenshot Guide', font=('Arial', 24, 'bold'))
+    label.pack(pady=20)
+
+    label = ttkbs.Label(screenshot_window, text='3. Make the shaka sign to take a screenshot', font=('Arial', 12))
+    label.pack(pady=5)
+
+    screenshot_gif = ttkbs.PhotoImage(file='images/shaka.png')
+    screenshot_label = ttkbs.Label(screenshot_window, image=screenshot_gif)
+    screenshot_label.pack(pady=20)
+
+    click_window.destroy()
+
+    next_button = ttkbs.Button(screenshot_window, text='Next', bootstyle='primary', command=lambda: login_window(screenshot_window))
+    next_button.pack(pady=10)
+
+    screenshot_window.mainloop()
+
+def login_window(screenshot_window):
+    # Create a login window
+    login_window = tk.Toplevel()
+    login_window.title('Login')
+    login_window.geometry('640x480')
+
+    label = ttkbs.Label(login_window, text='Login', font=('Arial', 24, 'bold'))
+    label.pack(pady=20)
+
+    username_label = ttkbs.Label(login_window, text='Username', font=('Arial', 14))
+    username_label.pack(pady=5)
+
+    username_entry = ttkbs.Entry(login_window, font=('Arial', 12))
+    username_entry.pack(pady=5)
+
+    password_label = ttkbs.Label(login_window, text='Password', font=('Arial', 14))
+    password_label.pack(pady=5)
+
+    password_entry = ttkbs.Entry(login_window, font=('Arial', 12), show='*')
+    password_entry.pack(pady=5)
+
+    login_button = ttkbs.Button(login_window, text='Login', bootstyle='primary',
+                                command=lambda: handle_login_gui(username_entry.get(), password_entry.get(), login_window))
+    login_button.pack(padx=10, pady=10)
+
+    screenshot_window.destroy()
+
+    login_window.mainloop()
 
 if __name__ == "__main__":
     window = ttkbs.Window(themename='darkly')  # Main window
     window.title('Hand Gesture Mouse Controller')
     window.geometry('640x480')
 
-    label = ttkbs.Label(window, text='Login', font=('Arial', 24, 'bold'))
-    label.pack(pady=20)
+    # Read the firsttime file to check if the user has logged in before
+    firsttime_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'firsttime.txt')
+    if os.path.exists(firsttime_file):
+        with open(firsttime_file, 'r') as f:
+            firsttime = f.read()
+    else:
+        firsttime = 'yes'
+    
+    if firsttime == 'yes':
 
-    username_label = ttkbs.Label(window, text='Username', font=('Arial', 14))
-    username_label.pack(pady=5)
+       handle_firsttime()
 
-    username_entry = ttkbs.Entry(window, font=('Arial', 12))
-    username_entry.pack(pady=5)
+    elif firsttime == 'no':
 
-    password_label = ttkbs.Label(window, text='Password', font=('Arial', 14))
-    password_label.pack(pady=5)
+        label = ttkbs.Label(window, text='Login', font=('Arial', 24, 'bold'))
+        label.pack(pady=20)
 
-    password_entry = ttkbs.Entry(window, font=('Arial', 12), show='*')
-    password_entry.pack(pady=5)
+        username_label = ttkbs.Label(window, text='Username', font=('Arial', 14))
+        username_label.pack(pady=5)
 
-    login_button = ttkbs.Button(window, text='Login', bootstyle='primary',
-                                command=lambda: handle_login_gui(username_entry.get(), password_entry.get()))
-    login_button.pack(padx=10, pady=10)
+        username_entry = ttkbs.Entry(window, font=('Arial', 12))
+        username_entry.pack(pady=5)
+
+        password_label = ttkbs.Label(window, text='Password', font=('Arial', 14))
+        password_label.pack(pady=5)
+
+        password_entry = ttkbs.Entry(window, font=('Arial', 12), show='*')
+        password_entry.pack(pady=5)
+
+        login_button = ttkbs.Button(window, text='Login', bootstyle='primary',
+                                    command=lambda: handle_login_gui(username_entry.get(), password_entry.get()))
+        login_button.pack(padx=10, pady=10)
 
     window.mainloop()
