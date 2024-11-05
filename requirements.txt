@@ -1,7 +1,10 @@
 opencv-python
 numpy
-mediapipe
 pyautogui
-requests
+pyaudio
+vosk
+sounddevice
 ttkbootstrap
-firebase-admin
+firebase_admin
+mediapipe
+requests

@@ -5,6 +5,7 @@ __pycache__/
 
 # Gestures JSON File
 gesture_config.json
+stt_config.json
 
 # Firebase JSON File
 config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json
@@ -13,6 +14,14 @@ capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json
 
 # The new user file
 firsttime.txt
+
+# Firebase JSON File Zone Identifier
+config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json:Zone.Identifier
+config\capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json:Zone.Identifier
+capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json:Zone.Identifier
+
+# VSCode Config Folder
+.vscode/
 
 # C extensions
 *.so
