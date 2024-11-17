@@ -157,36 +157,27 @@ class HandMouseController:
         thumb_distance = np.linalg.norm(np.array(thumb_tip) - np.array(midpoint))
         index_distance = np.linalg.norm(np.array(index_tip) - np.array(midpoint))
 
-        print(f"Thumb distance to midpoint: {thumb_distance}")
-        print(f"Index distance to midpoint: {index_distance}")
-
         # Check if both fingers are close to the imaginary button
         if thumb_distance < self.button_threshold and index_distance < self.button_threshold:
-            print("Both fingers are touching the imaginary button")  # Debugging
             if self.touch_start_time is None:
                 self.touch_start_time = time.time()
                 self.dragging = False
-                print("Touch start time set")  # Debugging
             else:
                 elapsed_time = time.time() - self.touch_start_time
                 print(f"Elapsed time: {elapsed_time}")  # Debugging
                 if elapsed_time > self.drag_threshold and not self.dragging:
                     # Start dragging
-                    print("Starting drag")  # Debugging
                     pyautogui.mouseDown()
                     self.dragging = True
         else:
-            print("Fingers are not touching the imaginary button")  # Debugging
             if self.touch_start_time is not None:
                 elapsed_time = time.time() - self.touch_start_time
                 print(f"Elapsed time: {elapsed_time}")  # Debugging
                 if elapsed_time < self.drag_threshold and not self.dragging:
                     # Perform click
-                    print("Performing click")  # Debugging
                     pyautogui.click()
                 elif self.dragging:
                     # Stop dragging
-                    print("Stopping drag")  # Debugging
                     pyautogui.mouseUp()
                     self.dragging = False
             self.touch_start_time = None
@@ -224,7 +215,6 @@ class HandMouseController:
             else:
                 fingers.append(0)  # Finger is down
 
-        print(f"Fingers Up: {fingers}")  # Debugging
         return fingers  # [Thumb, Index, Middle, Ring, Pinky]
 
 
@@ -234,7 +224,6 @@ class HandMouseController:
     def detect_middle_finger_gesture(self):
         """Detects if the middle finger is up and other fingers are down."""
         fingers = self.fingers_up()
-        print(f"Middle Finger Gesture Detection - Fingers: {fingers}")  # Debugging statement
         # Exclude thumb from consideration
         if fingers[1:] == [0, 1, 0, 0]:  # [Index, Middle, Ring, Pinky]
             return True
@@ -305,7 +294,6 @@ class HandMouseController:
         if fingers_pattern in gesture_patterns:
             gesture = str(gesture_patterns[fingers_pattern])  # Convert gesture number to string
             print(f"Detected Gesture: {gesture}")
-            print(f"Type of Current Gesture: {type(self.current_gesture)}, Type of Detected Gesture: {type(gesture)}")
             if gesture in self.gesture_actions:
                 action = self.gesture_actions[gesture]
                 if self.current_gesture != gesture:
@@ -344,14 +332,8 @@ class HandMouseController:
                 subprocess.Popen('calc')
             elif normalized_action == "open notepad":
                 subprocess.Popen('notepad')
-            elif normalized_action == "lock screen":
-                pyautogui.hotkey('win', 'l')
             elif normalized_action == "play/pause media":
                 pyautogui.press('playpause')
-            elif normalized_action == "next track":
-                pyautogui.press('nexttrack')
-            elif normalized_action == "previous track":
-                pyautogui.press('prevtrack')
             elif normalized_action == "volume up":
                 pyautogui.press('volumeup')
             elif normalized_action == "volume down":
@@ -475,10 +457,7 @@ def configure_gestures():
         "Open Snipping Tool",
         "Open Calculator",
         "Open Notepad",
-        "Lock Screen",
         "Play/Pause Media",
-        "Next Track",
-        "Previous Track",
         "Volume Up",
         "Volume Down",
         "Mute/Unmute",
