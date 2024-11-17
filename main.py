@@ -66,8 +66,9 @@ class HandMouseController:
         # Gesture state variables
         self.dragging = False
         self.touch_start_time = None
-        self.click_threshold = 0.3  # seconds
-        self.drag_threshold = 0.3  # seconds
+        self.click_threshold = 0.1  # seconds
+        self.drag_threshold = 0.4  # seconds
+        self.button_threshold = 10  # Threshold for imaginary button
 
         # Screenshot state variables
         self.screenshot_cooldown = 2  # seconds
@@ -83,6 +84,7 @@ class HandMouseController:
         self.gesture_start_time = None
 
         self.fist_detected_seconds = 0  # Counter for the seconds the fist is detected
+        pass
 
     def display_no_camera_popup(self):
         """Displays a popup window if no camera is detected and closes the application after a delay."""
@@ -144,50 +146,51 @@ class HandMouseController:
 
     def handle_gesture(self, thumb_tip, index_tip):
         """Handles click and drag events based on thumb and index fingertip positions."""
-        fingers = self.fingers_up()
-        print(f"Handle Gesture - Fingers: {fingers}")  # Debugging
+        # Calculate the midpoint between thumb and index finger
+        midpoint = (
+            (thumb_tip[0] + index_tip[0]) // 2,
+            (thumb_tip[1] + index_tip[1]) // 2
+        )
+        # No need to define button_threshold here
 
-        # Check if index finger is up and others are down (excluding thumb)
-        if fingers[1] == 1 and sum(fingers[2:]) == 0:
-            # Check if thumb and index finger are touching
-            distance = np.linalg.norm(np.array(thumb_tip) - np.array(index_tip))
-            print(f"Distance between thumb and index: {distance}")  # Debugging
-            if self.is_fingers_touching(thumb_tip, index_tip):
-                print("Thumb and index are touching")  # Debugging
-                if self.touch_start_time is None:
-                    self.touch_start_time = time.time()
-                    self.dragging = False
-                    print("Touch start time set")  # Debugging
-                else:
-                    elapsed_time = time.time() - self.touch_start_time
-                    print(f"Elapsed time: {elapsed_time}")  # Debugging
-                    if elapsed_time > self.drag_threshold and not self.dragging:
-                        # Start dragging
-                        print("Starting drag")  # Debugging
-                        pyautogui.mouseDown()
-                        self.dragging = True
-            else:
-                print("Thumb and index are not touching")  # Debugging
-                if self.touch_start_time is not None:
-                    elapsed_time = time.time() - self.touch_start_time
-                    print(f"Elapsed time: {elapsed_time}")  # Debugging
-                    if elapsed_time < self.click_threshold and not self.dragging:
-                        # Perform click
-                        print("Performing click")  # Debugging
-                        pyautogui.click()
-                    elif self.dragging:
-                        # Stop dragging
-                        print("Stopping drag")  # Debugging
-                        pyautogui.mouseUp()
-                        self.dragging = False
-                self.touch_start_time = None
-        else:
-            # If other fingers are up, reset dragging state
-            if self.dragging:
-                print("Resetting drag state")  # Debugging
-                pyautogui.mouseUp()
+        # Calculate distances from thumb tip and index tip to the midpoint
+        thumb_distance = np.linalg.norm(np.array(thumb_tip) - np.array(midpoint))
+        index_distance = np.linalg.norm(np.array(index_tip) - np.array(midpoint))
+
+        print(f"Thumb distance to midpoint: {thumb_distance}")
+        print(f"Index distance to midpoint: {index_distance}")
+
+        # Check if both fingers are close to the imaginary button
+        if thumb_distance < self.button_threshold and index_distance < self.button_threshold:
+            print("Both fingers are touching the imaginary button")  # Debugging
+            if self.touch_start_time is None:
+                self.touch_start_time = time.time()
                 self.dragging = False
+                print("Touch start time set")  # Debugging
+            else:
+                elapsed_time = time.time() - self.touch_start_time
+                print(f"Elapsed time: {elapsed_time}")  # Debugging
+                if elapsed_time > self.drag_threshold and not self.dragging:
+                    # Start dragging
+                    print("Starting drag")  # Debugging
+                    pyautogui.mouseDown()
+                    self.dragging = True
+        else:
+            print("Fingers are not touching the imaginary button")  # Debugging
+            if self.touch_start_time is not None:
+                elapsed_time = time.time() - self.touch_start_time
+                print(f"Elapsed time: {elapsed_time}")  # Debugging
+                if elapsed_time < self.drag_threshold and not self.dragging:
+                    # Perform click
+                    print("Performing click")  # Debugging
+                    pyautogui.click()
+                elif self.dragging:
+                    # Stop dragging
+                    print("Stopping drag")  # Debugging
+                    pyautogui.mouseUp()
+                    self.dragging = False
             self.touch_start_time = None
+
 
 
     def fingers_up(self):
@@ -195,13 +198,19 @@ class HandMouseController:
         fingers = []
         threshold = 5  # Adjust as needed
 
-        # Thumb detection using y-coordinates
-        thumb_tip_y = self.lm_list[4][1]
-        thumb_ip_y = self.lm_list[3][1]
-        if thumb_ip_y - thumb_tip_y > threshold:
-            fingers.append(1)  # Thumb is up
-        else:
-            fingers.append(0)  # Thumb is down
+        # Thumb detection using x-coordinates
+        thumb_tip_x = self.lm_list[4][0]
+        thumb_mcp_x = self.lm_list[2][0]
+        if self.hand_label == 'Right':
+            if thumb_tip_x > thumb_mcp_x + threshold:
+                fingers.append(1)  # Thumb is up
+            else:
+                fingers.append(0)  # Thumb is down
+        else:  # Left hand
+            if thumb_tip_x < thumb_mcp_x - threshold:
+                fingers.append(1)  # Thumb is up
+            else:
+                fingers.append(0)  # Thumb is down
 
         # Fingers (Index to Pinky)
         tips_ids = [8, 12, 16, 20]
@@ -210,13 +219,14 @@ class HandMouseController:
         for tip_id, pip_id in zip(tips_ids, pip_ids):
             tip_y = self.lm_list[tip_id][1]
             pip_y = self.lm_list[pip_id][1]
-            if pip_y - tip_y > threshold:
+            if tip_y < pip_y - threshold:
                 fingers.append(1)  # Finger is up
             else:
                 fingers.append(0)  # Finger is down
 
         print(f"Fingers Up: {fingers}")  # Debugging
         return fingers  # [Thumb, Index, Middle, Ring, Pinky]
+
 
 
 
@@ -383,7 +393,16 @@ class HandMouseController:
                     # Handle click and drag first
                     self.handle_gesture(thumb_tip, index_tip)
 
-                    # Then detect other gestures
+                    # Calculate midpoint for visualization
+                    midpoint = (
+                        (thumb_tip[0] + index_tip[0]) // 2,
+                        (thumb_tip[1] + index_tip[1]) // 2
+                    )
+
+                    # Draw the imaginary button (for visualization)
+                    cv2.circle(img, midpoint, self.button_threshold, (0, 255, 0), 2)  # Green circle
+
+                    # Detect other gestures
                     if self.detect_middle_finger_gesture():
                         print("Middle finger gesture detected - Exiting")
                         break
@@ -391,9 +410,9 @@ class HandMouseController:
                         self.take_screenshot()
                     elif self.detect_curled_fist():
                         self.fist_detected_seconds += 0.1  # Increment counter if fist is detected
-                        if self.fist_detected_seconds >= 42:  # Check if the fist has been held for 42 seconds
-                            webbrowser.open("https://blacklivesmatter.com/")  # Easter Egg
-                            self.fist_detected_seconds = 0  # Reset the counter after opening the website
+                        if self.fist_detected_seconds >= 42:  # Easter Egg
+                            webbrowser.open("https://blacklivesmatter.com/")
+                            self.fist_detected_seconds = 0
                     else:
                         self.detect_custom_gestures()
 
@@ -436,6 +455,8 @@ def deactivate_stt():
     global stop_event
     stop_event.set()
     stt_thread.join()
+
+
 
 
 # GUI functions for configuration
