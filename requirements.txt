@@ -4,7 +4,8 @@ pyautogui
 pyaudio
 vosk
 sounddevice
-ttkbootstrap
+customtkinter
+win11toast
 firebase_admin
 mediapipe
 requests
