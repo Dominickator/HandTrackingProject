@@ -5,14 +5,12 @@ import pyautogui
 import time
 import os
 import webbrowser
-from tkinter import simpledialog
-import tkinter as tk
-from tkinter import messagebox, ttk
 import requests
-import ttkbootstrap as ttkbs
 from threading import Thread, Event
+from win11toast import toast
 import json  # To store configurations
 import subprocess  # To run applications
+from PIL import Image
 
 import sounddevice
 import speech_to_text as stt
@@ -21,12 +19,15 @@ import speech_to_text as stt
 import firebase_admin
 from firebase_admin import credentials, auth
 
-from ttkbootstrap.scrolled import ScrolledFrame
-from ttkbootstrap.toast import ToastNotification
-from ttkbootstrap.tooltip import ToolTip
-from ttkbootstrap.widgets import DateEntry, Floodgauge, Meter
+import customtkinter as ctk
+
 
 #tmp = os.listdir("HandTrackingProject/config")
+
+
+# Initialize CustomTkinter App
+ctk.set_appearance_mode("dark")  # Modes: "light", "dark", "system"
+ctk.set_default_color_theme("blue")  # Themes: "blue", "green", "dark-blue"
 
 
 # Initialize Firebase with the certificate
@@ -86,23 +87,9 @@ class HandMouseController:
 
     def display_no_camera_popup(self):
         """Displays a popup window if no camera is detected and closes the application after a delay."""
-        popup_window = tk.Tk()
-        popup_window.withdraw()  # Hide the root window
-
-        # Create a messagebox with a delay
-        def close_after_delay():
-            time.sleep(10)  # Wait for 10 seconds
-            popup_window.quit()  # Close the window
 
         # Show the error message
-        messagebox.showerror("Camera Not Found", "No camera detected. The application will close in 10 seconds or press OK to exit now.")
-        
-        # Start the delay in a separate thread so it doesn't block the UI
-        delay_thread = Thread(target=close_after_delay)
-        delay_thread.start()
-
-        # Start the Tkinter event loop to keep the popup alive
-        popup_window.mainloop()
+        toast("Camera Not Found", "No camera detected. The application will close in 10 seconds or press OK to exit now.")
 
         # Ensure the application exits gracefully
         os._exit(1)
@@ -423,10 +410,9 @@ def run_stt(stop_event:Event):
         try:
             stt_data = json.load(f)
             device = stt_data['device']
-            toast = ToastNotification("Speech-To-Text Active", f"Speech is being translated to text", duration=3000, bootstyle='success', position = (50, 50, 'ne'))
+            toast("Configuration Loaded", f"Speech-To-Text Configuration loaded successfully. Using device: {device}")
         except json.JSONDecodeError:
-            toast = ToastNotification("Configuration Error", f"Failed to load Speech-To-Text Configuration. Is it configured correctly?", duration=3000, bootstyle='danger', position = (50, 50, 'ne'))
-    toast.show_toast()
+            toast("Configuration Error", f"Failed to load Speech-To-Text Configuration. Is it configured correctly?")
     global stt_thread
     stt_thread = Thread(name="stt_thread",target=stt.run_stt, daemon=True, args=(device, stop_event))
     stt_thread.start()
@@ -437,470 +423,515 @@ def deactivate_stt():
     stop_event.set()
     stt_thread.join()
 
+class App(ctk.CTk):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if os.path.exists("first_time.txt"):
+            self.open_login_window()
+        else:
+            self.first_time_user()
+    
+    def open_login_window(self, screenshot_window=None):
+        login_window = ctk.CTk()
+        login_window.title("Login")
+        login_window.geometry("800x600")
 
-# GUI functions for configuration
-def configure_gestures():
-    """Opens a GUI for users to assign actions to gestures."""
-    config_window = tk.Toplevel()  # Use Toplevel instead of ttkbs.Window
-    config_window.title('Configure Gestures')
-    config_window.geometry('640x480')
+        if screenshot_window:
+            screenshot_window.destroy()
 
-    # Title for the configuration window
-    title_label = ttkbs.Label(config_window, text='Configure Gestures', font=('Arial', 24, 'bold'))
-    title_label.pack(pady=20)
+            # Create the first_time.txt file
+            with open("first_time.txt", "w") as f:
+                f.write("First Time")
 
-    gestures = [2, 3, 4]  # Number of fingers up to configure
-    actions = [
-        "Open Snipping Tool",
-        "Open Calculator",
-        "Open Notepad",
-        "Lock Screen",
-        "Play/Pause Media",
-        "Next Track",
-        "Previous Track",
-        "Volume Up",
-        "Volume Down",
-        "Mute/Unmute",
-        "Other..."
-    ]
+        # Create a frame for the login form
+        login_frame = ctk.CTkFrame(login_window)
+        login_frame.pack(pady=100)
 
-    default_gesture_actions = {
-        "2": "Open Calculator",
-        "3": "Open Snipping Tool",
-        "4": "Open Notepad"
-    }
+        # Create a title label
+        title_label = ctk.CTkLabel(login_frame, text="Login", font=("Arial", 28, "bold"))
+        title_label.pack(pady=20)
 
-    # Load existing configuration if available
-    config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
-    if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
-        with open(config_file, 'r') as f:
-            try:
-                gesture_actions = json.load(f)
-            except json.JSONDecodeError:
-                print("Invalid JSON in gesture_config.json. Loading default configuration.")
-                messagebox.showwarning("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")
-                gesture_actions = default_gesture_actions.copy()
-                # Save default configuration back to the file
-                with open(config_file, 'w') as fw:
-                    json.dump(gesture_actions, fw)
-    else:
-        # File doesn't exist or is empty, use default configuration
-        gesture_actions = default_gesture_actions.copy()
-        # Save default configuration to the file
-        with open(config_file, 'w') as f:
-            json.dump(gesture_actions, f)
+        # Create a username label and entry
+        username_label = ctk.CTkLabel(login_frame, text="Username", font=("Arial", 16))
+        username_label.pack(pady=5, padx=75)
+        username_entry = ctk.CTkEntry(login_frame, font=("Arial", 16), width=200)
+        username_entry.pack(pady=10, padx=75)
 
-    dropdowns = {}
+        # Create a password label and entry
+        password_label = ctk.CTkLabel(login_frame, text="Password", font=("Arial", 16))
+        password_label.pack(pady=5, padx=75)
+        password_entry = ctk.CTkEntry(login_frame, show="*", font=("Arial", 16), width=200)
+        password_entry.pack(pady=10, padx=75)
 
-    def save_configuration():
-        # Save the selected actions
-        for g in gestures:
-            selected_action = dropdowns[g].get()
-            if selected_action == "Other...":
-                # Prompt user for custom input
-                custom_action = simpledialog.askstring("Custom Action", f"Enter custom action for gesture {g}:")
-                if custom_action:
-                    gesture_actions[str(g)] = custom_action
-                else:
-                    # If no input, default to the previous action
-                    gesture_actions[str(g)] = gesture_actions.get(str(g), actions[0])
-                    dropdowns[g].set(gesture_actions[str(g)])
+        # Create a login button
+        def login():
+            email = username_entry.get()
+            password = password_entry.get()
+            api_key = "AIzaSyCp1nDe4uciVKuJn0G-Io8JVQ5Tsz869OM"
+            url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
+            payload = {
+                "email": email,
+                "password": password,
+                "returnSecureToken": True
+            }
+            response = requests.post(url, json=payload)
+            
+            if response.status_code == 200:
+                # Create a toast on a separate thread
+                Thread(target=lambda: toast("Login Successful", "You have been logged in successfully!")).start()
+                return True
             else:
-                gesture_actions[str(g)] = selected_action
-        try:
-            with open(config_file, 'w') as f:
-                json.dump(gesture_actions, f)
-            toast = ToastNotification("Configuration Saved", "Gestures configuration saved successfully.", duration=3000, bootstyle='success', position = (50, 50, 'ne'))
-        except Exception as e:
-            toast = ToastNotification("Configuration Error", f"Failed to save configurations: {e}", duration=3000, bootstyle='danger', position = (50, 50, 'ne'))
-            print(f"Failed to save configurations: {e}")
-        toast.show_toast()
-        config_window.destroy()
+                return False
+        
+        def handle_login():
+            success = login()
+            if success:
+                login_window.withdraw()
+                self.open_main_window()
 
-    for g in gestures:
-        label = ttkbs.Label(config_window, text=f'Gesture: {g} Fingers Up', font=('Arial', 12))
+        login_button = ctk.CTkButton(login_frame, text="Login", font=("Arial", 16), command=handle_login)
+        login_button.pack(pady=20)
+
+        login_window.resizable(False, False)
+        login_window.mainloop()
+    
+    def check_new_user(self):
+        # Check for the existence of the first_time.txt file
+        if not os.path.exists("first_time.txt"):
+            # If the file does not exist, create it and return True
+            with open("first_time.txt", "w") as f:
+                f.write("First Time")
+            return True
+        else:
+            # If the file exists, return False
+            return False
+
+    def config_stt(self):
+        """Opens a new window to configure Speech-To-Text settings."""
+        config_window = ctk.CTkToplevel()  # Use CTkToplevel instead of Toplevel
+        config_window.title('Configure Speech-to-Text')
+        config_window.geometry('640x480')
+
+        # Title for the configuration window
+        title_label = ctk.CTkLabel(config_window, text='Configure Speech-to-Text', font=('Arial', 24, 'bold'))
+        title_label.pack(pady=20)
+
+        devList = list(sounddevice.query_devices())
+        devNames = []
+        devDict = {}
+        for dev in devList:
+            devName = f"[{dev['index']}] {dev['name']}"
+            devNames.append(devName)
+            devDict[devName] = dev['index']
+
+        default_sound_settings = {
+            "device": ''
+        }
+
+        # Load existing configuration if available
+        config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'stt_config.json')
+        if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
+            with open(config_file, 'r') as f:
+                try:
+                    stt_data = json.load(f)
+                except json.JSONDecodeError:
+                    print("Invalid JSON in stt_config.json. Loading default configuration.")
+                    Thread(target=lambda: toast("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")).start()
+                    stt_data = default_sound_settings.copy()
+                    # Save default configuration back to the file
+                    with open(config_file, 'w') as fw:
+                        json.dump(stt_data, fw)
+        else:
+            # File doesn't exist or is empty, use default configuration
+            stt_data = default_sound_settings.copy()
+            # Save default configuration to the file
+            with open(config_file, 'w') as f:
+                json.dump(stt_data, f)
+
+        def save_configuration():
+            selected_device = devDict[dropdown.get()]  # devName
+            default_sound_settings['device'] = selected_device
+            try:
+                with open(config_file, 'w') as f:
+                    json.dump(default_sound_settings, f)
+                Thread(target=lambda: toast("Configuration Saved", "Speech-to-Text configuration saved successfully!")).start()
+            except Exception as e:
+                Thread(target=lambda: toast("Configuration Error", f"Failed to save settings: {e}")).start()
+                print(f"Failed to save settings: {e}")
+            config_window.destroy()
+
+        label = ctk.CTkLabel(config_window, text="Choose Input Device:", font=('Arial', 12))
         label.pack(pady=5)
 
-        default_value = gesture_actions.get(str(g), actions[0])
-        dropdown = ttkbs.Combobox(config_window, values=actions, state='readonly', bootstyle='primary')
+        default_value = stt_data.get("device", devNames[0])
+        dropdown = ctk.CTkOptionMenu(config_window, values=devNames)
         dropdown.set(default_value)
         dropdown.pack(pady=5)
-        dropdowns[g] = dropdown
 
-    save_button = ttkbs.Button(config_window, text='Save', bootstyle='primary', command=save_configuration)
-    save_button.pack(pady=20)
+        save_button = ctk.CTkButton(config_window, text='Save', command=save_configuration)
+        save_button.pack(pady=20)
 
-    config_window.mainloop()
+        config_window.mainloop()
 
-def configure_stt():
-    config_window = tk.Toplevel()  # Use Toplevel instead of ttkbs.Window
-    config_window.title('Configure Speech-to-Text')
-    config_window.geometry('640x480')
+    def config_gestures(self):
+        """Opens a new window to configure gesture actions."""
+        config_window = ctk.CTkToplevel()  # Use CTkToplevel instead of Toplevel
+        config_window.title('Configure Gestures')
+        config_window.geometry('640x480')
 
-    # Title for the configuration window
-    title_label = ttkbs.Label(config_window, text='Configure Speech-to-Text', font=('Arial', 24, 'bold'))
-    title_label.pack(pady=20)
+        # Title for the configuration window
+        title_label = ctk.CTkLabel(config_window, text='Configure Gestures', font=('Arial', 24, 'bold'))
+        title_label.pack(pady=20)
 
-    devList = list(sounddevice.query_devices())
-    devNames = []
-    devDict = {}
-    for dev in devList:
-        devName = f"[{dev['index']}] {dev['name']}"
-        devNames.append(devName)
-        devDict[devName] = dev['index']
+        gestures = [2, 3, 4]  # Number of fingers up to configure
+        actions = [
+            "Open Snipping Tool",
+            "Open Calculator",
+            "Open Notepad",
+            "Play/Pause Media",
+            "Volume Up",
+            "Volume Down",
+            "Mute/Unmute",
+            "Other..."
+        ]
 
-    default_sound_settings = {
-        "device": ''
-    }
+        default_gesture_actions = {
+            "2": "Open Calculator",
+            "3": "Open Snipping Tool",
+            "4": "Open Notepad"
+        }
 
-    # Load existing configuration if available
-    config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'stt_config.json')
-    if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
-        with open(config_file, 'r') as f:
-            try:
-                stt_data = json.load(f)
-            except json.JSONDecodeError:
-                print("Invalid JSON in stt_config.json. Loading default configuration.")
-                messagebox.showwarning("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")
-                stt_data = default_sound_settings.copy()
-                # Save default configuration back to the file
-                with open(config_file, 'w') as fw:
-                    json.dump(stt_data, fw)
-    else:
-        # File doesn't exist or is empty, use default configuration
-        stt_data = default_sound_settings.copy()
-        # Save default configuration to the file
-        with open(config_file, 'w') as f:
-            json.dump(stt_data, f)
-
-    def save_configuration():
-        selected_device = devDict[dropdown.get()]#devName
-        default_sound_settings['device'] = selected_device
-        try:
-            with open(config_file, 'w') as f:
-                json.dump(default_sound_settings, f)
-            toast = ToastNotification("Configuration Saved", "Gestures configuration saved successfully.", duration=3000, bootstyle='success', position = (50, 50, 'ne'))
-        except Exception as e:
-            toast = ToastNotification("Configuration Error", f"Failed to save settings: {e}", duration=3000, bootstyle='danger', position = (50, 50, 'ne'))
-            print(f"Failed to save settings: {e}")
-        toast.show_toast()
-        config_window.destroy()
-
-    
-    label = ttkbs.Label(config_window, text=f"Choose Input Device:", font=('Arial', 12))
-    label.pack(pady=5)
-
-    default_value = default_sound_settings.get("name", devName[0])
-    dropdown = ttkbs.Combobox(config_window, values=devNames, state='readonly', bootstyle='primary')
-    dropdown.set(default_value)
-    dropdown.pack(pady=5)
-
-
-    save_button = ttkbs.Button(config_window, text='Save', bootstyle='primary', command=save_configuration)
-    save_button.pack(pady=20)
-
-    config_window.mainloop()
-
-# Define the login function
-def login(email, password):
-    api_key = "AIzaSyCp1nDe4uciVKuJn0G-Io8JVQ5Tsz869OM"
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
-    payload = {
-        "email": email,
-        "password": password,
-        "returnSecureToken": True
-    }
-    response = requests.post(url, json=payload)
-    
-    if response.status_code == 200:
-        print("User authenticated successfully:", email)
-        return True
-    else:
-        print("Failed to authenticate:", response.json().get("error", {}).get("message"))
-        return False
-
-def handle_login_gui(username, password, login_window = None):
-    # Handle login using Firebase
-    if login(username, password):
-        # Login successful, open main application window
-        open_main_window(username, login_window)
-    else:
-        messagebox.showerror("Login Failed", "Invalid username or password. Please try again.")
-
-def open_main_window(username, login_window=None):
-    # Hide the login window instead of destroying it
-    window.withdraw()
-
-    if login_window:
-        login_window.destroy()
-
-    # Create the main application window
-    app_window = tk.Toplevel()
-    app_window.title('Hand Gesture Mouse Controller')
-    app_window.geometry('640x480')
-
-    label = ttkbs.Label(app_window, text=f'Welcome, {username}!', font=('Arial', 24, 'bold'))
-    label.pack(pady=20)
-
-    start_button = ttkbs.Button(app_window, text='Start Hand Gesture Controller', bootstyle='primary',
-                                command=lambda: start_hand_mouse_controller(app_window))
-    start_button.pack(pady=20)
-
-    config_button = ttkbs.Button(app_window, text='Configure Gestures', bootstyle='primary', command=configure_gestures)
-    config_button.pack(pady=10)
-
-    #DEBUG
-    config_button = ttkbs.Button(app_window, text='Activate STT', bootstyle='primary', command=activate_stt)
-    config_button.pack(pady=10)
-
-    #DEBUG
-    config_button = ttkbs.Button(app_window, text='Deactivate STT', bootstyle='primary', command=deactivate_stt)
-    config_button.pack(pady=10)
-
-
-    config_button = ttkbs.Button(app_window, text='Configure Speech-To-Text', bootstyle='primary', command=configure_stt)
-    config_button.pack(pady=10)
-
-    view_button = ttkbs.Button(app_window, text='View Hand Gesture Guide', bootstyle='primary', command=view_gestures)
-    view_button.pack(pady=10)
-
-    def on_app_window_close():
-        # Make sure the main window is destroyed when the app window is closed
-        app_window.destroy()
-        window.destroy()
-
-    # Bind the close event to ensure the main window is properly destroyed
-    app_window.protocol("WM_DELETE_WINDOW", on_app_window_close)
-
-    app_window.mainloop()
-
-def start_hand_mouse_controller(app_window):
-    # Hide the app window temporarily while the loading window is shown
-    app_window.withdraw()
-
-    # Create a loading window
-    loading_window = tk.Toplevel(app_window)
-    loading_window.title('Loading')
-    loading_window.geometry('400x125')
-
-    label = ttkbs.Label(loading_window, text='Starting camera...', font=('Arial', 18, 'bold'))
-    label.pack(pady=20)
-
-    progress_bar = ttkbs.Progressbar(loading_window, mode='indeterminate', bootstyle='primary-striped', length=300)
-    progress_bar.pack(pady=10)
-    progress_bar.start()
-
-    # Function to start the hand mouse controller
-    def start_controller():
-        # Load gesture configurations
+        # Load existing configuration if available
         config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
-        print(f"Configuration file path (loading): {config_file}")
+        if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
+            with open(config_file, 'r') as f:
+                try:
+                    gesture_actions = json.load(f)
+                except json.JSONDecodeError:
+                    print("Invalid JSON in gesture_config.json. Loading default configuration.")
+                    Thread(target=lambda: toast("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")).start()
+                    gesture_actions = default_gesture_actions.copy()
+                    # Save default configuration back to the file
+                    with open(config_file, 'w') as fw:
+                        json.dump(gesture_actions, fw)
+        else:
+            # File doesn't exist or is empty, use default configuration
+            gesture_actions = default_gesture_actions.copy()
+            # Save default configuration to the file
+            with open(config_file, 'w') as f:
+                json.dump(gesture_actions, f)
+
+        dropdowns = {}
+
+        for gesture in gestures:
+            frame = ctk.CTkFrame(config_window)
+            frame.pack(pady=10)
+
+            label = ctk.CTkLabel(frame, text=f"{gesture} Fingers Up", font=('Arial', 16))
+            label.pack(side="left", padx=10)
+
+            var = ctk.StringVar(value=gesture_actions.get(str(gesture), ""))
+            dropdown = ctk.CTkOptionMenu(frame, variable=var, values=actions)
+            dropdown.pack(side="left", padx=10)
+
+            dropdowns[gesture] = var
+
+        def save_configuration():
+            # Save the selected actions
+            for g in gestures:
+                selected_action = dropdowns[g].get()
+                if selected_action == "Other...":
+                    # Prompt user for custom input
+                    custom_action = ctk.CTkInputDialog(text="Enter action", title="Custom Action")
+                    if custom_action:
+                        gesture_actions[str(g)] = custom_action.get_input()
+                    else:
+                        # If no input, default to the previous action
+                        gesture_actions[str(g)] = gesture_actions.get(str(g), actions[0])
+                        dropdowns[g].set(gesture_actions[str(g)])
+                else:
+                    gesture_actions[str(g)] = selected_action
+            try:
+                with open(config_file, 'w') as f:
+                    json.dump(gesture_actions, f)
+                Thread(target=lambda: toast("Configuration Saved", "Gesture configuration saved successfully!")).start()
+            except Exception as e:
+                Thread(target=lambda: toast("Configuration Error", f"Failed to save configuration with error: {e}")).start()
+                print(f"Failed to save configurations: {e}")
+            config_window.destroy()
+
+        save_button = ctk.CTkButton(config_window, text="Save Configuration", command=save_configuration)
+        save_button.pack(pady=20)
+
+        config_window.mainloop()
+
+    def gesture_info(self):
+        """Opens a new window to display information about the gestures."""
+        # Create a gestures guide window
+        gestures_window = ctk.CTkToplevel()
+        gestures_window.title('Hand Gesture Guide')
+        gestures_window.geometry('640x480')
+
+        label = ctk.CTkLabel(gestures_window, text='Hand Gesture Guide', font=('Arial', 24, 'bold'))
+        label.pack(pady=20)
+
+        gesture_frame = ctk.CTkFrame(gestures_window)
+        gesture_frame.pack(pady=20)
+
+        # Load the gesture configurations from file
+        config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
         if os.path.exists(config_file):
             with open(config_file, 'r') as f:
                 gesture_actions = json.load(f)
         else:
             gesture_actions = {}
 
-        # Initialize the HandMouseController
-        controller = HandMouseController(gesture_actions)
-        loading_window.destroy()  # Close the loading window
-        app_window.deiconify()  # Show the app window again after loading
-        controller.run()
-        app_window.destroy()  # Destroy the app window when the controller finishes
+        gesture_descriptions = {
+            "1 Finger Up": "Move Cursor",
+            "2 Fingers Up": gesture_actions.get("2", "Not Configured"),
+            "3 Fingers Up": gesture_actions.get("3", "Not Configured"),
+            "4 Fingers Up": gesture_actions.get("4", "Not Configured"),
+            "Thumb and Index Touching": "Click/Drag",
+            "Middle Finger Up": "Exit Application",
+            "Shaka Sign": "Take Screenshot"
+        }
 
-    # Start the controller in a separate thread to avoid blocking the UI
-    Thread(target=start_controller).start()
+        for gesture, description in gesture_descriptions.items():
+            label = ctk.CTkLabel(gesture_frame, text=f'{gesture}: {description}', font=('Arial', 12))
+            label.pack(pady=5, padx=10)
 
+        gestures_window.mainloop()
 
-def view_gestures():
-    # Create a gestures guide window
-    gestures_window = tk.Toplevel()
-    gestures_window.title('Hand Gesture Guide')
-    gestures_window.geometry('640x480')
+    def open_main_window(self):
+        """Opens the main window of the project."""
+        main_window = ctk.CTk()
+        main_window.title("Hand Gesture Control")
+        main_window.geometry("800x650")
 
-    label = ttkbs.Label(gestures_window, text='Hand Gesture Guide', font=('Arial', 24, 'bold'))
-    label.pack(pady=20)
+        # Check if the user is new
+        new_user = self.check_new_user()
 
-    gesture_frame = ttkbs.Frame(gestures_window, padding=10)
-    gesture_frame.pack(expand=True, fill=tk.BOTH)
+        # Create a frame for the main window
+        main_frame = ctk.CTkFrame(main_window)
+        main_frame.pack(pady=15)
 
-    # Load the gesture configurations from file
-    config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
-    if os.path.exists(config_file):
-        with open(config_file, 'r') as f:
-            gesture_actions = json.load(f)
-    else:
-        gesture_actions = {}
+        # Create a title label
+        title_label = ctk.CTkLabel(main_frame, text="Main Menu", font=("Arial", 28, "bold"))
+        title_label.pack(pady=20, padx=50)
 
-    gesture_descriptions = {
-        "1 Finger Up": "Move Cursor",
-        "2 Fingers Up": gesture_actions.get("2", "Not Configured"),
-        "3 Fingers Up": gesture_actions.get("3", "Not Configured"),
-        "4 Fingers Up": gesture_actions.get("4", "Not Configured"),
-        "Thumb and Index Touching": "Click/Drag",
-        "Middle Finger Up": "Exit Application",
-        "Shaka Sign": "Take Screenshot"
-    }
+        # Create a frame for gesture controls
+        gesture_frame = ctk.CTkFrame(main_frame)
+        gesture_frame.pack(pady=20, padx=20, fill="both", expand=True)
 
-    for gesture, description in gesture_descriptions.items():
-        label = ttkbs.Label(gesture_frame, text=f'{gesture}: {description}', font=('Arial', 12))
-        label.pack(pady=5)
+        gesture_label = ctk.CTkLabel(gesture_frame, text="Gesture Controls", font=("Arial", 20, "bold"))
+        gesture_label.pack(pady=10)
 
-    gestures_window.mainloop()
+        # Create a button to start the Hand Gesture Control
+        def start_hand_gesture_control():
+            # Create a loading window
+            loading_window = ctk.CTkToplevel(self)
+            loading_window.title('Loading')
+            loading_window.geometry('400x125')
 
-def handle_firsttime():
-    # Hide the login window instead of destroying it
-    window.withdraw()
-    # Write the firsttime file to indicate that the user has logged in
-    firsttime_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'firsttime.txt')
-    with open(firsttime_file, 'w') as f:
-        f.write('no')
+            label = ctk.CTkLabel(loading_window, text='Starting camera...', font=('Arial', 18, 'bold'))
+            label.pack(pady=20)
 
-    # Open the first window, which is the hand movement window
-    movement_window()
+            progress_bar = ctk.CTkProgressBar(loading_window, mode='indeterminate')
+            progress_bar.pack(pady=10)
+            progress_bar.start()
 
-def movement_window():
-    # Create a window showing the user how to click
-    movement_window = tk.Toplevel()
-    movement_window.title('Movement Guide')
-    movement_window.geometry('640x480')
+            # Function to start the hand mouse controller
+            def start_controller():
+                # Load gesture configurations
+                config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
+                print(f"Configuration file path (loading): {config_file}")
+                if os.path.exists(config_file):
+                    with open(config_file, 'r') as f:
+                        gesture_actions = json.load(f)
+                else:
+                    gesture_actions = {}
 
-    window.withdraw()
+                # Initialize the HandMouseController
+                controller = HandMouseController(gesture_actions)
+                controller.run()
 
-    label = ttkbs.Label(movement_window, text='Movement Guide', font=('Arial', 24, 'bold'))
-    label.pack(pady=20)
+            # Start the controller in a separate thread to avoid blocking the UI
+            controller_thread = Thread(target=start_controller)
+            controller_thread.daemon = True
+            controller_thread.start()
 
-    label = ttkbs.Label(movement_window, text='1. Use the pointer finger to move the cursor', font=('Arial', 12))
-    label.pack(pady=5)
+            loading_window.after(15000, lambda: loading_window.destroy())
 
-    click_gif = ttkbs.PhotoImage(file='images/tap.png')
-    click_label = ttkbs.Label(movement_window, image=click_gif)
-    click_label.pack(pady=20)
+        start_button = ctk.CTkButton(gesture_frame, text="Start Hand Gesture Control", font=("Arial", 16), command=start_hand_gesture_control)
+        start_button.pack(pady=10)
 
-    next_button = ttkbs.Button(movement_window, text='Next', bootstyle='primary', command=lambda: click_window(movement_window))
-    next_button.pack(pady=10)
+        # Create a button to open the configuration window for Gesture Actions
+        config_gestures_button = ctk.CTkButton(gesture_frame, text="Configure Gesture Actions", font=("Arial", 16), command=self.config_gestures)
+        config_gestures_button.pack(pady=10)
 
-    def on_app_window_close():
-        # Make sure the main window is destroyed when the app window is closed
-        movement_window.destroy()
-        window.destroy()
+        # Create a button to open the gesture information window
+        gesture_info_button = ctk.CTkButton(gesture_frame, text="Gesture Information", font=("Arial", 16), command=self.gesture_info)
+        gesture_info_button.pack(pady=10)
 
-    # Bind the close event to ensure the main window is properly destroyed
-    movement_window.protocol("WM_DELETE_WINDOW", on_app_window_close)
+        # Create a frame for speech-to-text controls
+        stt_frame = ctk.CTkFrame(main_frame)
+        stt_frame.pack(pady=20, padx=20, fill="both", expand=True)
 
-    movement_window.mainloop()
+        stt_label = ctk.CTkLabel(stt_frame, text="Speech-To-Text Controls", font=("Arial", 20, "bold"))
+        stt_label.pack(pady=10)
 
-def click_window(movement_window):
-    # Create a window showing the user how to click
-    click_window = tk.Toplevel()
-    click_window.title('Click Guide')
-    click_window.geometry('640x480')
+        # Create a button to start the Speech-To-Text
+        def start_speech_to_text():
+            # Start the Speech-To-Text in a new thread
+            activate_stt()
 
-    label = ttkbs.Label(click_window, text='Click Guide', font=('Arial', 24, 'bold'))
-    label.pack(pady=20)
+        start_stt_button = ctk.CTkButton(stt_frame, text="Start Speech-To-Text", font=("Arial", 16), command=start_speech_to_text)
+        start_stt_button.pack(pady=10)
 
-    label = ttkbs.Label(click_window, text='2. Touch the thumb and index finger to click or drag', font=('Arial', 12))
-    label.pack(pady=5)
+        # Create a button to stop the Speech-To-Text
+        def stop_speech_to_text():
+            # Stop the Speech-To-Text
+            deactivate_stt()
 
-    click_gif = ttkbs.PhotoImage(file='images/measure.png')
-    click_label = ttkbs.Label(click_window, image=click_gif)
-    click_label.pack(pady=20)
+        stop_stt_button = ctk.CTkButton(stt_frame, text="Stop Speech-To-Text", font=("Arial", 16), command=stop_speech_to_text)
+        stop_stt_button.pack(pady=10)
 
-    movement_window.destroy()
+        # Create a button to open the configuration window for Speech-To-Text
+        config_stt_button = ctk.CTkButton(stt_frame, text="Configure Speech-To-Text", font=("Arial", 16), command=self.config_stt)
+        config_stt_button.pack(pady=10)
 
-    next_button = ttkbs.Button(click_window, text='Next', bootstyle='primary', command=lambda: screenshot_window(click_window))
-    next_button.pack(pady=10)
+        # Create a frame for appearance mode controls
+        mode_frame = ctk.CTkFrame(main_frame)
+        mode_frame.pack(pady=20, padx=20, fill="both", expand=True)
 
-    click_window.mainloop()
+        # Create a label and switch for appearance mode
+        mode_label = ctk.CTkLabel(mode_frame, text="Appearance Mode", font=("Arial", 16))
+        mode_label.pack(side="left", padx=10)
 
-def screenshot_window(click_window):
-    # Create a window showing the user how to take a screenshot
-    screenshot_window = tk.Toplevel()
-    screenshot_window.title('Screenshot Guide')
-    screenshot_window.geometry('640x480')
+        def change_mode():
+            value = switch_var.get()
+            if value:
+                ctk.set_appearance_mode("dark")
+                # Write the theme configuration to a file
+                with open("theme_config.txt", "w") as f:
+                    f.write("dark")
+            else:
+                ctk.set_appearance_mode("light")
+                # Write the theme configuration to a file
+                with open("theme_config.txt", "w") as f:
+                    f.write("light")
 
-    label = ttkbs.Label(screenshot_window, text='Screenshot Guide', font=('Arial', 24, 'bold'))
-    label.pack(pady=20)
+        switch_var = ctk.BooleanVar()
+        mode_switch = ctk.CTkSwitch(mode_frame, text="Dark Mode", command=change_mode, onvalue=True, offvalue=False, variable=switch_var)
+        mode_switch.pack(side="left", padx=10)
+        
+        # If the theme is dark, set the switch to True
+        if ctk.get_appearance_mode() == "dark":
+            switch_var.set(True)
+            mode_switch.select()
 
-    label = ttkbs.Label(screenshot_window, text='3. Make the shaka sign to take a screenshot', font=('Arial', 12))
-    label.pack(pady=5)
+        main_window.mainloop()
 
-    screenshot_gif = ttkbs.PhotoImage(file='images/shaka.png')
-    screenshot_label = ttkbs.Label(screenshot_window, image=screenshot_gif)
-    screenshot_label.pack(pady=20)
+    def first_time_user(self):
+        self.movement_window()
 
-    click_window.destroy()
+    def movement_window(self):
+        """Create a window showing the user how to move the cursor."""
+        movement_window = ctk.CTkToplevel()
+        movement_window.title('Movement Guide')
+        movement_window.geometry('640x480')
 
-    next_button = ttkbs.Button(screenshot_window, text='Next', bootstyle='primary', command=lambda: login_window(screenshot_window))
-    next_button.pack(pady=10)
-
-    screenshot_window.mainloop()
-
-def login_window(screenshot_window):
-    # Create a login window
-    login_window = tk.Toplevel()
-    login_window.title('Login')
-    login_window.geometry('640x480')
-
-    label = ttkbs.Label(login_window, text='Login', font=('Arial', 24, 'bold'))
-    label.pack(pady=20)
-
-    username_label = ttkbs.Label(login_window, text='Username', font=('Arial', 14))
-    username_label.pack(pady=5)
-
-    username_entry = ttkbs.Entry(login_window, font=('Arial', 12))
-    username_entry.pack(pady=5)
-
-    password_label = ttkbs.Label(login_window, text='Password', font=('Arial', 14))
-    password_label.pack(pady=5)
-
-    password_entry = ttkbs.Entry(login_window, font=('Arial', 12), show='*')
-    password_entry.pack(pady=5)
-
-    login_button = ttkbs.Button(login_window, text='Login', bootstyle='primary',
-                                command=lambda: handle_login_gui(username_entry.get(), password_entry.get(), login_window))
-    login_button.pack(padx=10, pady=10)
-
-    screenshot_window.destroy()
-
-    login_window.mainloop()
-
-if __name__ == "__main__":
-    window = ttkbs.Window(themename='darkly')  # Main window
-    window.title('Hand Gesture Mouse Controller')
-    window.geometry('640x480')
-
-    # Read the firsttime file to check if the user has logged in before
-    firsttime_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'firsttime.txt')
-    if os.path.exists(firsttime_file):
-        with open(firsttime_file, 'r') as f:
-            firsttime = f.read()
-    else:
-        firsttime = 'yes'
-    
-    if firsttime == 'yes':
-
-       handle_firsttime()
-
-    elif firsttime == 'no':
-
-        label = ttkbs.Label(window, text='Login', font=('Arial', 24, 'bold'))
+        label = ctk.CTkLabel(movement_window, text='Movement Guide', font=('Arial', 24, 'bold'))
         label.pack(pady=20)
 
-        username_label = ttkbs.Label(window, text='Username', font=('Arial', 14))
-        username_label.pack(pady=5)
+        label = ctk.CTkLabel(movement_window, text='1. Use the pointer finger to move the cursor', font=('Arial', 14))
+        label.pack(pady=5)
 
-        username_entry = ttkbs.Entry(window, font=('Arial', 12))
-        username_entry.pack(pady=5)
+        img = Image.open('images/tap.png')
 
-        password_label = ttkbs.Label(window, text='Password', font=('Arial', 14))
-        password_label.pack(pady=5)
+        click_gif = ctk.CTkImage(light_image=img, dark_image=img, size=(150, 150))
+        click_label = ctk.CTkLabel(movement_window, image=click_gif, text='')
+        click_label.pack(pady=10)
 
-        password_entry = ttkbs.Entry(window, font=('Arial', 12), show='*')
-        password_entry.pack(pady=5)
+        next_button = ctk.CTkButton(movement_window, text='Next', command=lambda: self.click_window(movement_window))
+        next_button.pack(pady=10)
 
-        login_button = ttkbs.Button(window, text='Login', bootstyle='primary',
-                                    command=lambda: handle_login_gui(username_entry.get(), password_entry.get()))
-        login_button.pack(padx=10, pady=10)
+        def on_app_window_close():
+            # Make sure the main window is destroyed when the app window is closed
+            movement_window.destroy()
+            self.destroy()
 
-    window.mainloop()
+        # Bind the close event to ensure the main window is properly destroyed
+        movement_window.protocol("WM_DELETE_WINDOW", on_app_window_close)
+
+        movement_window.mainloop()
+
+    def click_window(self, movement_window):
+        """Create a window showing the user how to click."""
+        click_window = ctk.CTkToplevel()
+        click_window.title('Click Guide')
+        click_window.geometry('640x480')
+
+        label = ctk.CTkLabel(click_window, text='Click Guide', font=('Arial', 24, 'bold'))
+        label.pack(pady=20)
+
+        label = ctk.CTkLabel(click_window, text='2. Touch the thumb and index finger to click or drag', font=('Arial', 14))
+        label.pack(pady=5)
+
+        img = Image.open('images/measure.png')
+
+        click_gif = ctk.CTkImage(light_image=img, dark_image=img, size=(150, 150))
+        click_label = ctk.CTkLabel(click_window, image=click_gif, text='')
+        click_label.pack(pady=10)
+
+        movement_window.destroy()
+
+        next_button = ctk.CTkButton(click_window, text='Next', command=lambda: self.screenshot_window(click_window))
+        next_button.pack(pady=10)
+
+        click_window.mainloop()
+
+    def screenshot_window(self, click_window):
+        """Create a window showing the user how to take a screenshot."""
+        screenshot_window = ctk.CTkToplevel()
+        screenshot_window.title('Screenshot Guide')
+        screenshot_window.geometry('640x480')
+
+        label = ctk.CTkLabel(screenshot_window, text='Screenshot Guide', font=('Arial', 24, 'bold'))
+        label.pack(pady=20)
+
+        label = ctk.CTkLabel(screenshot_window, text='3. Make the shaka sign to take a screenshot', font=('Arial', 14))
+        label.pack(pady=5)
+
+        img = Image.open('images/shaka.png')
+
+        click_gif = ctk.CTkImage(light_image=img, dark_image=img, size=(150, 150))
+        click_label = ctk.CTkLabel(screenshot_window, image=click_gif, text='')
+        click_label.pack(pady=10)
+
+        click_window.destroy()
+
+        next_button = ctk.CTkButton(screenshot_window, text='Next', command=lambda: self.open_login_window(screenshot_window))
+        next_button.pack(pady=10)
+
+        screenshot_window.mainloop()
+
+if __name__ == "__main__":
+    # Load gesture actions from configuration file
+    config_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'gesture_config.json')
+    with open(config_file, 'r') as f:
+        gesture_actions = json.load(f)
+
+    # Check for the existence of the theme_config.txt file
+    if os.path.exists("theme_config.txt"):
+        # If the file exists, load the theme configuration
+        with open("theme_config.txt", "r") as f:
+            theme = f.read().strip()
+        ctk.set_appearance_mode(theme)
+    else:
+        # If the file does not exist, use the default theme
+        ctk.set_appearance_mode("dark")
+
+    # Start the app
+    app = App()
+    app.mainloop()

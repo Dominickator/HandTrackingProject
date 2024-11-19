@@ -13,7 +13,10 @@ config\capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json
 capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json
 
 # The new user file
-firsttime.txt
+first_time.txt
+
+# Theme Config File
+theme_config.txt
 
 # Firebase JSON File Zone Identifier
 config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json:Zone.Identifier
