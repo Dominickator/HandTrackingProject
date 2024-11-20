@@ -5,7 +5,7 @@ pyaudio
 vosk
 sounddevice
 customtkinter
-win11toast
+notify-py
 firebase_admin
 mediapipe
 requests
