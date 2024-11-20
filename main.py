@@ -7,7 +7,8 @@ import os
 import webbrowser
 import requests
 from threading import Thread, Event
-from win11toast import toast
+import notifypy
+from notifypy import Notify
 import json  # To store configurations
 import subprocess  # To run applications
 from PIL import Image
@@ -33,6 +34,21 @@ ctk.set_default_color_theme("blue")  # Themes: "blue", "green", "dark-blue"
 # Initialize Firebase with the certificate
 cred = credentials.Certificate("config/capstone-project-1a804-firebase-adminsdk-46w3i-a1cb2293c8.json")
 firebase_admin.initialize_app(cred)
+
+# Initialize Notify instance
+notification = Notify(
+    default_notification_title="Hand Gesture Control",
+    default_application_name="Hand Tracking Mouse"
+    # default_notification_icon="path/to/icon.png",  # Update with actual icon path
+    # default_notification_audio="path/to/sound.wav"  # Update with actual sound path if needed
+)
+
+# Helper function for notifications
+def show_notification(title, message):
+    """Send a desktop notification."""
+    notification.title = title
+    notification.message = message
+    notification.send()
 
 class HandMouseController:
     def __init__(self, gesture_actions):
@@ -91,7 +107,7 @@ class HandMouseController:
         """Displays a popup window if no camera is detected and closes the application after a delay."""
 
         # Show the error message
-        toast("Camera Not Found", "No camera detected. The application will close in 10 seconds or press OK to exit now.")
+        show_notification("Camera Not Found", "No camera detected. The application will close in 10 seconds or press OK to exit now.")
 
         # Ensure the application exits gracefully
         os._exit(1)
@@ -411,9 +427,9 @@ def run_stt(stop_event:Event):
         try:
             stt_data = json.load(f)
             device = stt_data['device']
-            toast("Configuration Loaded", f"Speech-To-Text Configuration loaded successfully. Using device: {device}")
+            show_notification("Configuration Loaded", f"Speech-To-Text Configuration loaded successfully. Using device: {device}")
         except json.JSONDecodeError:
-            toast("Configuration Error", f"Failed to load Speech-To-Text Configuration. Is it configured correctly?")
+            show_notification("Configuration Error", f"Failed to load Speech-To-Text Configuration. Is it configured correctly?")
     global stt_thread
     stt_thread = Thread(name="stt_thread",target=stt.run_stt, daemon=True, args=(device, stop_event))
     stt_thread.start()
@@ -478,8 +494,8 @@ class App(ctk.CTk):
             response = requests.post(url, json=payload)
             
             if response.status_code == 200:
-                # Create a toast on a separate thread
-                Thread(target=lambda: toast("Login Successful", "You have been logged in successfully!")).start()
+                # Create a show_notification on a separate thread
+                Thread(target=lambda: show_notification("Login Successful", "You have been logged in successfully!")).start()
                 return True
             else:
                 return False
@@ -537,7 +553,7 @@ class App(ctk.CTk):
                     stt_data = json.load(f)
                 except json.JSONDecodeError:
                     print("Invalid JSON in stt_config.json. Loading default configuration.")
-                    Thread(target=lambda: toast("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")).start()
+                    Thread(target=lambda: show_notification("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")).start()
                     stt_data = default_sound_settings.copy()
                     # Save default configuration back to the file
                     with open(config_file, 'w') as fw:
@@ -555,9 +571,9 @@ class App(ctk.CTk):
             try:
                 with open(config_file, 'w') as f:
                     json.dump(default_sound_settings, f)
-                Thread(target=lambda: toast("Configuration Saved", "Speech-to-Text configuration saved successfully!")).start()
+                Thread(target=lambda: show_notification("Configuration Saved", "Speech-to-Text configuration saved successfully!")).start()
             except Exception as e:
-                Thread(target=lambda: toast("Configuration Error", f"Failed to save settings: {e}")).start()
+                Thread(target=lambda: show_notification("Configuration Error", f"Failed to save settings: {e}")).start()
                 print(f"Failed to save settings: {e}")
             config_window.destroy()
 
@@ -610,7 +626,7 @@ class App(ctk.CTk):
                     gesture_actions = json.load(f)
                 except json.JSONDecodeError:
                     print("Invalid JSON in gesture_config.json. Loading default configuration.")
-                    Thread(target=lambda: toast("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")).start()
+                    Thread(target=lambda: show_notification("Invalid Configuration", "The gesture configuration file is invalid. Loading default configuration.")).start()
                     gesture_actions = default_gesture_actions.copy()
                     # Save default configuration back to the file
                     with open(config_file, 'w') as fw:
@@ -655,9 +671,9 @@ class App(ctk.CTk):
             try:
                 with open(config_file, 'w') as f:
                     json.dump(gesture_actions, f)
-                Thread(target=lambda: toast("Configuration Saved", "Gesture configuration saved successfully!")).start()
+                Thread(target=lambda: show_notification("Configuration Saved", "Gesture configuration saved successfully!")).start()
             except Exception as e:
-                Thread(target=lambda: toast("Configuration Error", f"Failed to save configuration with error: {e}")).start()
+                Thread(target=lambda: show_notification("Configuration Error", f"Failed to save configuration with error: {e}")).start()
                 print(f"Failed to save configurations: {e}")
             config_window.destroy()
 
