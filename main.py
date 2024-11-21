@@ -461,7 +461,7 @@ def configure_gestures():
         "Volume Up",
         "Volume Down",
         "Mute/Unmute",
-        "Other..."
+        "Link to Website"
     ]
 
     default_gesture_actions = {
@@ -496,9 +496,9 @@ def configure_gestures():
         # Save the selected actions
         for g in gestures:
             selected_action = dropdowns[g].get()
-            if selected_action == "Other...":
+            if selected_action == "Link to Website":
                 # Prompt user for custom input
-                custom_action = simpledialog.askstring("Custom Action", f"Enter custom action for gesture {g}:")
+                custom_action = simpledialog.askstring("Custom Action", f"Enter website link for gesture {g}:")
                 if custom_action:
                     gesture_actions[str(g)] = custom_action
                 else:
