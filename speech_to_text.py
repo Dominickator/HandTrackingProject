@@ -33,38 +33,6 @@ def callback(indata, frames, time, status):
     q.put(bytes(indata))
 
 def run_stt(device, stop_event):
-    #parser = argparse.ArgumentParser(add_help=False)
-    #parser.add_argument(
-    #    "-l", "--list-devices", action="store_true",
-    #    help="show list of audio devices and exit")
-    #args, remaining = parser.parse_known_args()
-    #if args.list_devices:
-    #    print(sd.query_devices())
-    #    
-    #    
-    #    
-    #    devList = list(sd.query_devices())
-    #    devNames = []
-    #    for dev in devList:
-    #        devName = dev['name']
-    #        devNames.append(devName)
-#
-    #    
-    #    
-    #    
-    #    parser.exit(0)
-    #parser = argparse.ArgumentParser(
-    #    description=__doc__,
-    #    formatter_class=argparse.RawDescriptionHelpFormatter,
-    #    parents=[parser])
-    #parser.add_argument(
-    #    "-d", "--device", type=int_or_str,
-    #    help="input device (numeric ID or substring)")
-    #parser.add_argument(
-    #    "-s","--samplerate", type=int_or_str
-    #)
-    #args = parser.parse_known_args()
-
     try:
         device_info = sd.query_devices(device, "input")
         # soundfile expects an int, sounddevice provides a float:
@@ -85,21 +53,53 @@ def run_stt(device, stop_event):
                 wfAccepted = rec.AcceptWaveform(data)
                 if wfAccepted:
                     fullResult = result_to_text(rec.Result(),wfAccepted)
+                    fullResult = recognizeCommands(fullResult)
                     if fullResult != '':
+                        fullResult = formatGrammar(fullResult)
                         buffer_queue.put(fullResult)
                         print(f"Waveform accepted, recognized word/phrase: {fullResult}")
                 else:
                     parResult = result_to_text(rec.PartialResult(),wfAccepted)
                     if parResult != '':
                         #buffer_queue.put(parResult)
-                        print(f"Waveform partially accepted, recognized word/phrase: {parResult}")
+                        print(f"Partial waveform recognized, recognized word/phrase: {parResult}")
                 
                 while not buffer_queue.empty():
                     write(buffer_queue.get())
 
-
     except KeyboardInterrupt:
         print("\nDone")
 
+def recognizeCommands(input:str):
+    commandPhrase = ["period", "new line", "enter", "back space", "delete"]
+    input = input.lower()
+    if input in commandPhrase:
+        if input == "period":
+            return ". "
+        if input == "new line" or input =="enter":
+            return "\n"
+        if input == "back space" or input =="delete":
+            return "\b"
+    else:
+        return input
 
 
+
+#Currently very rudimentary, Vosk/Kaldi handles some, this applies some other common general cases.
+def formatGrammar(input:str):
+    #capitalize first letter
+
+    input = input.replace(input[:1], input[:1].upper(), 1)
+
+    #Append period and space to end of waveform, only if longer than 10 characters.
+    #Otherwise it is highly likely to either be a command character or intended as a comma
+    if len(input) > 10:
+        input += ". "
+    elif len(input) > 2:
+        input += ", "
+
+    #Capitalizing I
+    input = input.replace(" i ", " I ")
+    input = input.replace(" i'", " I'")
+
+    return input
